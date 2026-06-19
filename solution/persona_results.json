@@ -1,0 +1,47 @@
+{
+  "pool_size": 30000,
+  "pool_churn_rate": 0.7566,
+  "book_churn_rate": 0.4956,
+  "personas": {
+    "Aging-Handset": {
+      "customers": 20411,
+      "share": 0.6804,
+      "churn_rate": 0.7507,
+      "avg_rev": 52.58,
+      "avg_eqpdays": 563.2,
+      "avg_mou": 342.6,
+      "avg_overage": 14.21,
+      "action": "Proactive device-upgrade offer (financed/subsidized new handset)"
+    },
+    "Bill-Shock / Overage": {
+      "customers": 3775,
+      "share": 0.1258,
+      "churn_rate": 0.7634,
+      "avg_rev": 99.52,
+      "avg_eqpdays": 263.2,
+      "avg_mou": 892.9,
+      "avg_overage": 49.46,
+      "action": "Right-plan move to unlimited / overage alerts & auto-optimize"
+    },
+    "Stable-Loyalty": {
+      "customers": 3381,
+      "share": 0.1127,
+      "churn_rate": 0.7619,
+      "avg_rev": 45.11,
+      "avg_eqpdays": 297.1,
+      "avg_mou": 459.0,
+      "avg_overage": 1.8,
+      "action": "Loyalty credit / contract-renewal incentive / proactive check-in"
+    },
+    "Disengaging": {
+      "customers": 2433,
+      "share": 0.0811,
+      "churn_rate": 0.7883,
+      "avg_rev": 37.65,
+      "avg_eqpdays": 305.5,
+      "avg_mou": 155.2,
+      "avg_overage": 1.0,
+      "action": "Engagement bundle, data/perk incentives, usage win-back"
+    }
+  }
+}

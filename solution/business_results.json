@@ -1,0 +1,79 @@
+{
+  "score_top10": {
+    "capture": 0.1591,
+    "lift": 1.5906,
+    "rev_at_risk_capture": 0.1385
+  },
+  "evar_top10": {
+    "capture": 0.1196,
+    "lift": 1.1964,
+    "rev_at_risk_capture": 0.291
+  },
+  "score_top20": {
+    "capture": 0.2971,
+    "lift": 1.4853,
+    "rev_at_risk_capture": 0.279
+  },
+  "evar_top20": {
+    "capture": 0.2346,
+    "lift": 1.1729,
+    "rev_at_risk_capture": 0.448
+  },
+  "score_top30": {
+    "capture": 0.4224,
+    "lift": 1.4081,
+    "rev_at_risk_capture": 0.4027
+  },
+  "evar_top30": {
+    "capture": 0.349,
+    "lift": 1.1633,
+    "rev_at_risk_capture": 0.573
+  },
+  "roi": {
+    "N": 100000,
+    "ARPU_month": 58.7,
+    "ARPU_year": 704.4,
+    "annual_churn": 0.22,
+    "CAC": 350,
+    "margin": 0.33,
+    "target_frac": 0.2,
+    "offer_cost": 50,
+    "save_rate": 0.3,
+    "evar_rev_capture_top20": 0.448,
+    "evar_cust_capture_top20": 0.2346,
+    "total_churners": 22000,
+    "targeted_customers": 20000,
+    "total_rev_at_risk": 15496800,
+    "rev_reached_by_targeting": 6942566,
+    "saved_customers": 1548,
+    "rev_protected_1yr": 2082770,
+    "margin_protected_1yr": 687314,
+    "avoided_cac": 541926,
+    "campaign_cost": 1000000,
+    "net_benefit": 1624696,
+    "roi": 1.625,
+    "rev_protected_random": 929808,
+    "rev_protected_churnrank": 1297082,
+    "evar_vs_random_x": 2.24,
+    "evar_vs_churnrank_x": 1.61,
+    "rev_protected_2M": 41655398,
+    "net_benefit_2M": 32493918
+  },
+  "sensitivity": {
+    "0.2": {
+      "30": 1149797,
+      "50": 749797,
+      "75": 249797
+    },
+    "0.3": {
+      "30": 2024696,
+      "50": 1624696,
+      "75": 1124696
+    },
+    "0.4": {
+      "30": 2899595,
+      "50": 2499595,
+      "75": 1999595
+    }
+  }
+}
