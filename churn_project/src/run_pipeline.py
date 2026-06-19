@@ -101,7 +101,7 @@ def run_ablation(X_tr: pd.DataFrame, y_tr: pd.Series,
             active_cols.update(c for c in X_tr.columns if c.startswith(pat))
         cols = sorted(active_cols & set(X_tr.columns))
         mdl = XGBClassifier(
-            n_estimators=200, max_depth=4, learning_rate=0.05,
+            n_estimators=100, max_depth=4, learning_rate=0.05,
             subsample=0.8, colsample_bytree=0.8, min_child_weight=5,
             scale_pos_weight=spw, eval_metric="auc",
             n_jobs=1, random_state=C.RANDOM_STATE, tree_method="hist")
@@ -326,7 +326,7 @@ def run_uplift_simulation(X_tr, X_te, y_tr, y_te, proba_sample) -> dict:
     rng = np.random.default_rng(C.RANDOM_STATE)
     n = len(X_tr)
     treat = rng.integers(0, 2, size=n).astype(bool)
-    base_xgb = XGBClassifier(n_estimators=300, max_depth=4, learning_rate=0.05,
+    base_xgb = XGBClassifier(n_estimators=100, max_depth=4, learning_rate=0.05,
                              n_jobs=-1, random_state=C.RANDOM_STATE,
                              eval_metric="logloss", tree_method="hist")
     p_churn_tr = base_xgb.fit(X_tr, y_tr).predict_proba(X_tr)[:, 1]

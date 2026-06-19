@@ -71,10 +71,10 @@ def build_models(scale_pos_weight: float) -> dict:
                                        random_state=C.RANDOM_STATE)),
         ]),
         "Random Forest": RandomForestClassifier(
-            n_estimators=200, max_depth=10, min_samples_leaf=20,
+            n_estimators=80, max_depth=8, min_samples_leaf=20,
             n_jobs=1, class_weight="balanced", random_state=C.RANDOM_STATE),
         "XGBoost": XGBClassifier(
-            n_estimators=300, max_depth=5, learning_rate=0.05,
+            n_estimators=150, max_depth=5, learning_rate=0.05,
             subsample=0.8, colsample_bytree=0.8, min_child_weight=5,
             reg_lambda=1.0, scale_pos_weight=scale_pos_weight,
             eval_metric="auc", n_jobs=1, random_state=C.RANDOM_STATE,
@@ -82,7 +82,7 @@ def build_models(scale_pos_weight: float) -> dict:
         # CatBoost: categorical-aware gradient boosting (guideline §6).
         # verbose=0 suppresses per-iteration output.
         "CatBoost": CatBoostClassifier(
-            iterations=300, depth=5, learning_rate=0.05,
+            iterations=150, depth=5, learning_rate=0.05,
             l2_leaf_reg=3, subsample=0.8,
             auto_class_weights="Balanced",
             eval_metric="AUC", random_seed=C.RANDOM_STATE,
@@ -96,7 +96,7 @@ def build_models(scale_pos_weight: float) -> dict:
 XGBOOST_SEARCH_SPACE = {
     "max_depth": [2, 3, 4, 5, 6],
     "learning_rate": [0.01, 0.03, 0.05, 0.08, 0.10],
-    "n_estimators": [200, 300, 500],
+    "n_estimators": [100, 150, 200],
     "subsample": [0.6, 0.7, 0.8, 0.9],
     "colsample_bytree": [0.6, 0.7, 0.8, 0.9],
     "min_child_weight": [1, 3, 5, 10],
