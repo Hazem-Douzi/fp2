@@ -1,0 +1,243 @@
+{
+  "n_customers": 100000,
+  "n_features": 99,
+  "churn_rate_sample": 0.4956,
+  "ARPU_month": 58.72,
+  "tenure_median": 16.0,
+  "missing_top": {
+    "numbcars": 49.4,
+    "dwllsize": 38.3,
+    "HHstatin": 37.9,
+    "ownrent": 33.7,
+    "dwlltype": 31.9,
+    "lor": 30.2,
+    "income": 25.4,
+    "adults": 23.0,
+    "infobase": 22.1,
+    "hnd_webcap": 10.2
+  },
+  "corr_neg": {
+    "hnd_price": -0.103,
+    "totmrc_Mean": -0.069,
+    "mou_Mean": -0.057,
+    "mou_cvce_Mean": -0.052,
+    "complete_Mean": -0.052,
+    "comp_vce_Mean": -0.052
+  },
+  "corr_pos": {
+    "ovrmou_Mean": 0.02,
+    "months": 0.021,
+    "ovrrev_Mean": 0.024,
+    "vceovr_Mean": 0.024,
+    "uniqsubs": 0.04,
+    "eqpdays": 0.113
+  },
+  "eqp_bins": {
+    "<6mo": 0.415,
+    "6-12mo": 0.374,
+    "12-18mo": 0.594,
+    "18-24mo": 0.53,
+    "24mo+": 0.564
+  },
+  "lever_asl": {
+    "N": 0.51,
+    "Y": 0.409
+  },
+  "lever_refurb": {
+    "N": 0.489,
+    "R": 0.534
+  },
+  "lever_web": {
+    "N": 0.508,
+    "Y": 0.49
+  },
+  "models": {
+    "Logistic Regression": {
+      "auc": 0.6274,
+      "accuracy": 0.593,
+      "precision": 0.59,
+      "recall": 0.586,
+      "f1": 0.588,
+      "lift20": 1.289,
+      "capture20": 0.258,
+      "lift30": 1.253,
+      "capture30": 0.376
+    },
+    "Random Forest": {
+      "auc": 0.6721,
+      "accuracy": 0.619,
+      "precision": 0.609,
+      "recall": 0.645,
+      "f1": 0.627,
+      "lift20": 1.422,
+      "capture20": 0.284,
+      "lift30": 1.343,
+      "capture30": 0.403
+    },
+    "XGBoost": {
+      "auc": 0.6931,
+      "accuracy": 0.637,
+      "precision": 0.63,
+      "recall": 0.648,
+      "f1": 0.639,
+      "lift20": 1.483,
+      "capture20": 0.297,
+      "lift30": 1.399,
+      "capture30": 0.42
+    },
+    "LightGBM": {
+      "auc": 0.6926,
+      "accuracy": 0.635,
+      "precision": 0.63,
+      "recall": 0.642,
+      "f1": 0.636,
+      "lift20": 1.475,
+      "capture20": 0.295,
+      "lift30": 1.396,
+      "capture30": 0.419
+    }
+  },
+  "best_model": "XGBoost",
+  "cv_auc_mean": 0.6955,
+  "cv_auc_std": 0.0036,
+  "top_features": {
+    "refurb_new_R": 0.0351,
+    "eqpdays": 0.0347,
+    "months": 0.0237,
+    "refurb_new_N": 0.0235,
+    "hnd_price": 0.015,
+    "mou_Mean": 0.0131,
+    "ethnic_Z": 0.0125,
+    "ethnic_O": 0.0121,
+    "mou_per_eqpday": 0.012,
+    "creditcd_N": 0.0117,
+    "asl_flag_Y": 0.0116,
+    "asl_flag_N": 0.0112
+  },
+  "targeting": {
+    "by_score": {
+      "0.1": {
+        "cust_capture": 0.1574,
+        "rev_capture": 0.1375
+      },
+      "0.2": {
+        "cust_capture": 0.2966,
+        "rev_capture": 0.2785
+      },
+      "0.3": {
+        "cust_capture": 0.4196,
+        "rev_capture": 0.398
+      }
+    },
+    "by_evar": {
+      "0.1": {
+        "cust_capture": 0.1184,
+        "rev_capture": 0.2893
+      },
+      "0.2": {
+        "cust_capture": 0.2347,
+        "rev_capture": 0.448
+      },
+      "0.3": {
+        "cust_capture": 0.3499,
+        "rev_capture": 0.5738
+      }
+    },
+    "by_random": {
+      "0.1": {
+        "cust_capture": 0.101,
+        "rev_capture": 0.1025
+      },
+      "0.2": {
+        "cust_capture": 0.1976,
+        "rev_capture": 0.2015
+      },
+      "0.3": {
+        "cust_capture": 0.2965,
+        "rev_capture": 0.2996
+      }
+    }
+  },
+  "personas": {
+    "Aging-Handset": {
+      "customers": 2600,
+      "share": 0.347,
+      "churn_rate": 0.607,
+      "avg_rev": 87.61,
+      "avg_eqpdays": 616.0
+    },
+    "Bill-Shock / Overage": {
+      "customers": 2251,
+      "share": 0.3,
+      "churn_rate": 0.534,
+      "avg_rev": 136.5,
+      "avg_eqpdays": 209.0
+    },
+    "Disengaging": {
+      "customers": 136,
+      "share": 0.018,
+      "churn_rate": 0.801,
+      "avg_rev": 43.86,
+      "avg_eqpdays": 300.0
+    },
+    "Stable-Loyalty": {
+      "customers": 2513,
+      "share": 0.335,
+      "churn_rate": 0.575,
+      "avg_rev": 83.44,
+      "avg_eqpdays": 248.0
+    }
+  },
+  "pool_size_frac": 0.3,
+  "business": {
+    "N": 1000000,
+    "ARPU_month": 58.72,
+    "annual_churn": 0.22,
+    "margin": 0.5,
+    "save_rate": 0.3,
+    "offer_cost": 30,
+    "target_frac": 0.2,
+    "CAC": 350,
+    "rev_at_risk": 155020800,
+    "evar_rev_capture20": 0.448,
+    "evar_cust_capture20": 0.2347,
+    "rev_protected": 20834796,
+    "margin_protected": 10417398,
+    "avoided_cac": 5421570,
+    "campaign_cost": 6000000,
+    "gross_benefit": 15838968,
+    "net_benefit": 9838968,
+    "roi": 1.64,
+    "saved_customers": 15490,
+    "evar_vs_score_x": 1.61,
+    "evar_vs_random_x": 2.22,
+    "net_5M": 49194839
+  },
+  "clv": 1601.0,
+  "sensitivity": {
+    "0.20": {
+      "20": 6559312,
+      "30": 4559312,
+      "50": 559312
+    },
+    "0.30": {
+      "20": 11838968,
+      "30": 9838968,
+      "50": 5838968
+    },
+    "0.40": {
+      "20": 17118624,
+      "30": 15118624,
+      "50": 11118624
+    }
+  },
+  "quote": {
+    "net_value_1M": 9838968,
+    "gross_value_1M": 15838968,
+    "setup_fee": 300000,
+    "monthly_fee": 45000,
+    "annual_fee": 840000,
+    "pct_of_net": 8.5,
+    "client_keeps": 8998968
+  }
+}
