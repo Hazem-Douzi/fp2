@@ -80,7 +80,7 @@ text(80,H-292,"A Data-Driven Customer Retention Strategy for Company A",24,HexCo
 wrap(80,H-360,"Predicting and preventing telecom churn with machine learning — turning 100,000 customer records into a quantified, ROI-positive retention program.",16,HexColor("#94a3b8"),"Helvetica",leading=24,maxw=760)
 # right metric panel
 rect(900,H-470,300,300,HexColor("#274b73"),r=18)
-text(925,H-225,"0.695",44,ORANGE,"Helvetica-Bold"); text(925,H-250,"XGBoost ROC-AUC",13,HexColor("#cbd5e1"))
+text(925,H-225,"0.693",44,ORANGE,"Helvetica-Bold"); text(925,H-250,"XGBoost ROC-AUC",13,HexColor("#cbd5e1"))
 text(925,H-300,"$22.6M",30,WHITE,"Helvetica-Bold"); text(925,H-323,"net benefit / yr (per 1M subs)",12,HexColor("#cbd5e1"))
 text(925,H-370,"2.57x",30,TEAL,"Helvetica-Bold"); text(925,H-393,"return on retention spend",12,HexColor("#cbd5e1"))
 text(80,70,"IT Consulting — Proof of Concept  ·  Prepared for Company A Executive Team",13,HexColor("#94a3b8"))
@@ -214,7 +214,7 @@ footer("Method: scikit-learn pipelines + XGBoost. Reproducible in the accompanyi
 c.showPage()
 
 # ============================================================ SLIDE 10 — RESULTS
-page_bg(); header("Results: XGBoost is the best model — AUC 0.695","MODEL RESULTS  (NAME · METRIC · SCORE)",10)
+page_bg(); header("Results: XGBoost is the best model — AUC 0.693","MODEL RESULTS  (NAME · METRIC · SCORE)",10)
 img(f"{FIG}/05_roc.png",80,150,560,430)
 # table
 tx,ty=690,H-200; rw=470
@@ -225,9 +225,9 @@ text(tx+18,ty-30,"Model performance (held-out test set)",13,NAVY,"Helvetica-Bold
 xx=tx+18
 for i,h in enumerate(cols):
     text(xx,ty-58,h,11,MUTE,"Helvetica-Bold"); xx+=cw[i]
-rows=[("Logistic Regression","0.631","0.592","0.591","0.592",False),
-      ("Random Forest","0.671","0.612","0.639","0.625",False),
-      ("XGBoost","0.695","0.632","0.646","0.639",True)]
+rows=[("Logistic Regression","0.629","0.592","0.590","0.591",False),
+      ("Random Forest","0.673","0.612","0.650","0.631",False),
+      ("XGBoost","0.693","0.631","0.645","0.638",True)]
 ry=ty-86
 for name,a,p,r,f,best in rows:
     if best: rect(tx+8,ry-8,rw-16,30,HexColor("#fff7ed"),r=8)
@@ -237,7 +237,7 @@ for name,a,p,r,f,best in rows:
     ry-=34
 text(tx+18,ry-2,"Winner: XGBoost — chosen for deployment.",12.5,GREEN,"Helvetica-Bold")
 rect(690,150,470,120,LIGHT,r=12)
-wrap(712,250,"How to read AUC:  0.5 = random guessing, 1.0 = perfect. At 0.695 the model reliably ranks a churner above a non-churner ~70% of the time — strong enough to target retention spend profitably.",12.5,NAVY,leading=18,maxw=430)
+wrap(712,250,"How to read AUC:  0.5 = random guessing, 1.0 = perfect. At 0.693 the model reliably ranks a churner above a non-churner ~69% of the time — strong enough to target retention spend profitably.",12.5,NAVY,leading=18,maxw=430)
 footer("Metric: ROC-AUC (primary) + precision/recall/F1. Scores from authors' notebook, 25% hold-out, seed=42.")
 c.showPage()
 
