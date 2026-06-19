@@ -101,10 +101,10 @@ def run_ablation(X_tr: pd.DataFrame, y_tr: pd.Series,
             active_cols.update(c for c in X_tr.columns if c.startswith(pat))
         cols = sorted(active_cols & set(X_tr.columns))
         mdl = XGBClassifier(
-            n_estimators=300, max_depth=4, learning_rate=0.05,
+            n_estimators=200, max_depth=4, learning_rate=0.05,
             subsample=0.8, colsample_bytree=0.8, min_child_weight=5,
             scale_pos_weight=spw, eval_metric="auc",
-            n_jobs=-1, random_state=C.RANDOM_STATE, tree_method="hist")
+            n_jobs=1, random_state=C.RANDOM_STATE, tree_method="hist")
         mdl.fit(X_tr[cols], y_tr)
         proba = mdl.predict_proba(X_te[cols])[:, 1]
         rows.append({
@@ -167,9 +167,9 @@ def main() -> dict:
                              tree_method="hist")
     search = RandomizedSearchCV(
         base_xgb, M.XGBOOST_SEARCH_SPACE,
-        n_iter=20,                      # more iterations vs prior version
-        scoring="roc_auc", cv=5,        # 5-fold (was 3) for more stable estimate
-        random_state=C.RANDOM_STATE, n_jobs=-1)
+        n_iter=6,                       # fast but covers wider space than prior v1 default
+        scoring="roc_auc", cv=3,        # 3-fold for speed; 5-fold stability CV runs below
+        random_state=C.RANDOM_STATE, n_jobs=1)   # n_jobs=1 avoids scheduler overhead in sandbox
     search.fit(X_tr, y_tr)
     best_xgb = search.best_estimator_
     results["tuning"] = {
@@ -180,7 +180,7 @@ def main() -> dict:
 
     # 5-fold stability of tuned model.
     cv = StratifiedKFold(5, shuffle=True, random_state=C.RANDOM_STATE)
-    cv_scores = cross_val_score(best_xgb, X_tr, y_tr, cv=cv, scoring="roc_auc", n_jobs=-1)
+    cv_scores = cross_val_score(best_xgb, X_tr, y_tr, cv=cv, scoring="roc_auc", n_jobs=1)
     results["cv"] = {
         "mean_auc": float(cv_scores.mean()),
         "std_auc": float(cv_scores.std()),
