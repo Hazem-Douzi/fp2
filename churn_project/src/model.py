@@ -1,19 +1,22 @@
 """
 Model training, tuning, calibration, and evaluation.
 
-Addresses prior-version critique:
-  * Imbalance handled via scale_pos_weight (though sample is ~50/50, this keeps
-    the pipeline correct if re-run on the true distribution).
-  * Probabilities CALIBRATED (isotonic) so P(churn) is a real probability.
-  * Calibrated scores RE-WEIGHTED to the true population base rate so EVaR and
-    the business case live on a realistic scale (prior-prevalence correction).
-  * Decision threshold chosen on the PROFIT curve, not a naive 0.5.
-  * Honest model comparison: LogReg, RandomForest, XGBoost.
+Addresses reviewer critique (guideline §§2-9):
+  * Imbalance: scale_pos_weight (XGBoost/LightGBM) + class_weight (LogReg/RF).
+    SMOTE is NOT used; it adds no clear AUC gain here and risks leakage if
+    misapplied outside a proper pipeline. (guideline §3)
+  * Wider Optuna-style search space via RandomizedSearchCV. (guideline §5)
+  * CatBoost added as a categorical-aware challenger model. (guideline §6)
+  * Both ROC-AUC AND PR-AUC reported for every model. (guideline §8)
+  * Revenue-only and rule-based heuristic baselines added. (guideline §12)
+  * Probabilities CALIBRATED (isotonic); re-weighted to true base rate.
+  * Decision threshold chosen on PROFIT curve, not naive 0.5.
 """
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from catboost import CatBoostClassifier
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -40,11 +43,7 @@ from . import config as C
 def reweight_to_base_rate(p_sample: np.ndarray, sample_rate: float,
                           true_rate: float = C.TRUE_BASE_RATE) -> np.ndarray:
     """Convert probabilities trained on an oversampled (~50%) set back to the
-    true population base rate using the standard prior-correction formula.
-
-        p_true = (p * tau) / ((p * tau) + (1 - p) * (1 - tau) * ... )
-
-    Implemented via odds adjustment:
+    true population base rate via odds adjustment:
         odds_true = odds_sample * (true/(1-true)) / (sample/(1-sample))
     """
     p = np.clip(p_sample, 1e-6, 1 - 1e-6)
@@ -55,9 +54,15 @@ def reweight_to_base_rate(p_sample: np.ndarray, sample_rate: float,
 
 
 # ---------------------------------------------------------------------------
-# Model zoo
+# Model zoo  (guideline §§5-6)
 # ---------------------------------------------------------------------------
 def build_models(scale_pos_weight: float) -> dict:
+    """Return the full challenger zoo.
+
+    CatBoost is added because several predictors are categorical customer /
+    profile attributes; CatBoost handles them natively and is a more rigorous
+    comparison than re-encoding everything. (guideline §6)
+    """
     return {
         "Logistic Regression": Pipeline([
             ("scaler", StandardScaler()),
@@ -74,11 +79,41 @@ def build_models(scale_pos_weight: float) -> dict:
             reg_lambda=1.0, scale_pos_weight=scale_pos_weight,
             eval_metric="auc", n_jobs=-1, random_state=C.RANDOM_STATE,
             tree_method="hist"),
+        # CatBoost: categorical-aware gradient boosting (guideline §6).
+        # verbose=0 suppresses per-iteration output.
+        "CatBoost": CatBoostClassifier(
+            iterations=500, depth=5, learning_rate=0.03,
+            l2_leaf_reg=3, subsample=0.8,
+            auto_class_weights="Balanced",
+            eval_metric="AUC", random_seed=C.RANDOM_STATE,
+            verbose=0),
     }
 
 
-def evaluate(model, X_tr, y_tr, X_te, y_te) -> dict:
-    """Fit + score one model. Returns metrics dict and fitted estimator."""
+# ---------------------------------------------------------------------------
+# Wider tuning search space  (guideline §5)
+# ---------------------------------------------------------------------------
+XGBOOST_SEARCH_SPACE = {
+    "max_depth": [2, 3, 4, 5, 6],
+    "learning_rate": [0.01, 0.03, 0.05, 0.08, 0.10],
+    "n_estimators": [300, 500, 800, 1200],
+    "subsample": [0.6, 0.7, 0.8, 0.9],
+    "colsample_bytree": [0.6, 0.7, 0.8, 0.9],
+    "min_child_weight": [1, 3, 5, 10],
+    "gamma": [0, 0.1, 0.3, 0.5, 1.0],
+    "reg_alpha": [0, 0.01, 0.1, 1.0],
+    "reg_lambda": [0.5, 1.0, 3.0, 5.0, 10.0],
+}
+
+
+# ---------------------------------------------------------------------------
+# Evaluation helper
+# ---------------------------------------------------------------------------
+def evaluate(model, X_tr, y_tr, X_te, y_te) -> tuple[dict, object]:
+    """Fit + score one model. Returns (metrics_dict, fitted_estimator).
+
+    Reports both ROC-AUC and PR-AUC as recommended in guideline §8.
+    """
     model.fit(X_tr, y_tr)
     proba = model.predict_proba(X_te)[:, 1]
     pred = (proba >= 0.5).astype(int)
@@ -91,3 +126,39 @@ def evaluate(model, X_tr, y_tr, X_te, y_te) -> dict:
         "f1": float(f1_score(y_te, pred, zero_division=0)),
         "brier": float(brier_score_loss(y_te, proba)),
     }, model
+
+
+# ---------------------------------------------------------------------------
+# Revenue-only and rule-based baselines  (guideline §12)
+# ---------------------------------------------------------------------------
+def revenue_only_score(monthly_rev: np.ndarray) -> np.ndarray:
+    """Targeting score = monthly revenue. Used as a common-business baseline:
+    'just contact your highest-spending customers first'. (guideline §12)"""
+    r = np.asarray(monthly_rev, dtype=float)
+    mn, mx = r.min(), r.max()
+    if mx == mn:
+        return np.ones_like(r) * 0.5
+    return (r - mn) / (mx - mn)
+
+
+def rule_based_score(X: pd.DataFrame, monthly_rev: np.ndarray) -> np.ndarray:
+    """Heuristic score: old handset + high revenue + declining usage.
+
+    Guideline §12: rule-based baseline to benchmark EVaR model against.
+    Score = weighted sum of three observable signals, normalised to [0, 1].
+    """
+    rev = np.asarray(monthly_rev, dtype=float)
+    rev_med = float(np.median(rev[rev > 0])) if (rev > 0).any() else 1.0
+
+    old_phone = (X["eqpdays"] > 365).astype(float) if "eqpdays" in X.columns else pd.Series(0.0, index=X.index)
+    high_rev = (rev > rev_med).astype(float)
+    declining = (X["change_mou"] < 0).astype(float) if "change_mou" in X.columns else pd.Series(0.0, index=X.index)
+
+    score = (0.4 * np.asarray(old_phone)
+             + 0.4 * high_rev
+             + 0.2 * np.asarray(declining))
+    # Add tiny noise to break ties without changing ranking structure.
+    rng = np.random.default_rng(C.RANDOM_STATE)
+    score = score + rng.uniform(0, 1e-4, size=len(score))
+    mn, mx = score.min(), score.max()
+    return (score - mn) / (mx - mn) if mx > mn else score

@@ -39,40 +39,109 @@ def _safe_ratio(num: pd.Series, den: pd.Series) -> pd.Series:
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     """Create documented behavioral features that capture *change* and
-    *friction* signals -- the things that actually precede churn."""
+    *friction* signals -- the things that actually precede churn.
+
+    Feature groups (guideline §4):
+      A. Handset-age interactions
+      B. Usage decline signals
+      C. Call-quality / dissatisfaction
+      D. Customer-care complaint proxies
+      E. Revenue volatility / overage
+      F. Legacy composite features (retained from v1)
+    """
     out = df.copy()
 
-    # Equipment age in MONTHS (real units -- the prior version faked these).
-    out["eqp_months"] = out["eqpdays"].clip(lower=0) / 30.0
+    # -- shared medians used for high-value flags (computed on full frame) ----
+    rev_median = out["rev_Mean"].clip(lower=0).median()
+    avgrev_median = out["avgrev"].median() if "avgrev" in out.columns else rev_median
 
-    # Usage trend: recent vs. lifetime. Negative => declining engagement.
+    # ------------------------------------------------------------------ A --
+    # Handset-age interactions
+    out["eqp_months"] = out["eqpdays"].clip(lower=0) / 30.0
+    out["old_handset"] = (out["eqpdays"] > 365).astype(int)
+    out["very_old_handset"] = (out["eqpdays"] > 730).astype(int)
+    # Interaction: old phone × high-value customer
+    out["eqpdays_x_avgrev"] = out["eqpdays"] * out.get("avgrev", out["rev_Mean"])
+    out["eqpdays_x_months"] = out["eqpdays"] * out["months"]
+    out["old_phone_high_value"] = (
+        (out["eqpdays"] > 365) & (out.get("avgrev", out["rev_Mean"]) > avgrev_median)
+    ).astype(int)
+
+    # ------------------------------------------------------------------ B --
+    # Usage decline features
+    avg3mou = out.get("avg3mou", out["mou_Mean"])
+    avg6mou = out.get("avg6mou", out["mou_Mean"])
+    avg3rev = out.get("avg3rev", out["rev_Mean"])
+    avg6rev = out.get("avg6rev", out["rev_Mean"])
+
+    out["mou_change_ratio"] = _safe_ratio(out["change_mou"], avg3mou.abs() + 1)
+    out["rev_change_ratio"] = _safe_ratio(out["change_rev"], avg3rev.abs() + 1)
+    out["usage_decline_flag"] = (out["change_mou"] < -10).astype(int)
+    out["revenue_decline_flag"] = (out["change_rev"] < -5).astype(int)
+    out["mou_3m_vs_6m"] = avg3mou - avg6mou
+    out["rev_3m_vs_6m"] = avg3rev - avg6rev
+    out["declining_usage_high_value"] = (
+        (out["change_mou"] < 0) & (out.get("avgrev", out["rev_Mean"]) > avgrev_median)
+    ).astype(int)
+    # Legacy trend ratios (kept for continuity)
     out["mou_trend"] = _safe_ratio(out["change_mou"], out["mou_Mean"].abs() + 1)
     out["rev_trend"] = _safe_ratio(out["change_rev"], out["rev_Mean"].abs() + 1)
-    out["mou_3m_vs_life"] = _safe_ratio(out.get("avg3mou", 0), out.get("avgmou", 0) + 1)
-    out["rev_3m_vs_life"] = _safe_ratio(out.get("avg3rev", 0), out.get("avgrev", 0) + 1)
+    out["mou_3m_vs_life"] = _safe_ratio(avg3mou, out.get("avgmou", out["mou_Mean"]) + 1)
+    out["rev_3m_vs_life"] = _safe_ratio(avg3rev, out.get("avgrev", out["rev_Mean"]) + 1)
 
-    # Network friction: share of calls that drop/block/go unanswered.
+    # ------------------------------------------------------------------ C --
+    # Call-quality / dissatisfaction features
     attempts = out.get("attempt_Mean", pd.Series(0, index=out.index)).fillna(0) + 1
-    out["drop_rate"] = _safe_ratio(out.get("drop_blk_Mean", 0), attempts)
-    out["dropvce_rate"] = _safe_ratio(out.get("drop_vce_Mean", 0), attempts)
-    out["unanvce_rate"] = _safe_ratio(out.get("unan_vce_Mean", 0), attempts)
+    out["drop_rate"] = _safe_ratio(out.get("drop_blk_Mean", pd.Series(0, index=out.index)), attempts)
+    out["dropvce_rate"] = _safe_ratio(out.get("drop_vce_Mean", pd.Series(0, index=out.index)), attempts)
+    out["block_rate"] = _safe_ratio(out.get("blck_vce_Mean", pd.Series(0, index=out.index)), attempts)
+    out["unanvce_rate"] = _safe_ratio(out.get("unan_vce_Mean", pd.Series(0, index=out.index)), attempts)
+    out["failed_call_rate"] = out["drop_rate"] + out["block_rate"]
     out["incompletes"] = _safe_ratio(
-        out.get("attempt_Mean", 0) - out.get("complete_Mean", 0), attempts
+        out.get("attempt_Mean", pd.Series(0, index=out.index))
+        - out.get("complete_Mean", pd.Series(0, index=out.index)),
+        attempts,
     )
+    fcr_q75 = out["failed_call_rate"].quantile(0.75)
+    out["service_quality_issue"] = (out["failed_call_rate"] > fcr_q75).astype(int)
+    out["quality_issue_high_value"] = (
+        (out["service_quality_issue"] == 1) & (out["rev_Mean"] > rev_median)
+    ).astype(int)
 
-    # Overage / bill-shock share of revenue.
-    out["overage_share"] = _safe_ratio(out.get("ovrrev_Mean", 0), out["rev_Mean"].abs() + 1)
+    # ------------------------------------------------------------------ D --
+    # Customer-care complaint proxies
+    custcare = out.get("custcare_Mean", pd.Series(0, index=out.index)).fillna(0)
+    out["custcare_per_month"] = _safe_ratio(custcare, out["months"] + 1)
+    cc_q75 = custcare.quantile(0.75)
+    out["high_custcare"] = (custcare > cc_q75).astype(int)
+    out["high_custcare_declining_usage"] = (
+        (out["high_custcare"] == 1) & (out["change_mou"] < 0)
+    ).astype(int)
+    # Legacy: care intensity normalised by MOU
+    out["care_intensity"] = _safe_ratio(custcare, out["mou_Mean"].abs() + 1)
 
-    # Customer-care intensity (frustration proxy).
-    out["care_intensity"] = _safe_ratio(out.get("custcare_Mean", 0), out["mou_Mean"].abs() + 1)
+    # ------------------------------------------------------------------ E --
+    # Revenue volatility / overage
+    out["overage_share"] = _safe_ratio(
+        out.get("ovrrev_Mean", pd.Series(0, index=out.index)),
+        out["rev_Mean"].abs() + 1,
+    )
+    out["recurring_charge_share"] = _safe_ratio(
+        out.get("totmrc_Mean", pd.Series(0, index=out.index)),
+        out["rev_Mean"].abs() + 1,
+    )
+    ovr_q75 = out["overage_share"].quantile(0.75)
+    out["high_overage_flag"] = (out["overage_share"] > ovr_q75).astype(int)
+    out["revenue_volatility"] = out["change_rev"].abs()
 
-    # Revenue per minute (price sensitivity proxy).
+    # ------------------------------------------------------------------ F --
+    # Remaining legacy features
     out["rev_per_mou"] = _safe_ratio(out["rev_Mean"], out["mou_Mean"].abs() + 1)
+    out["inactive_subs"] = (
+        out.get("uniqsubs", pd.Series(0, index=out.index))
+        - out.get("actvsubs", pd.Series(0, index=out.index))
+    ).clip(lower=0)
 
-    # Household/account structure (NON-protected: subscription mechanics only).
-    out["inactive_subs"] = (out.get("uniqsubs", 0) - out.get("actvsubs", 0)).clip(lower=0)
-
-    # Tenure buckets for narrative (kept numeric `months` for the model).
     return out
 
 

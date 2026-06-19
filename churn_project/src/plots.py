@@ -41,16 +41,31 @@ def _save(fig, name):
 
 
 def fig_model_comparison(comparison: dict):
+    """Horizontal bar chart showing ROC-AUC and PR-AUC side by side.
+    Adding PR-AUC addresses guideline §8: report both metrics for imbalanced churn.
+    """
     names = list(comparison.keys())
-    aucs = [comparison[n]["auc"] for n in names]
-    fig, ax = plt.subplots(figsize=(7, 4.2))
-    bars = ax.barh(names, aucs, color=[GREY, TEAL, NAVY])
-    for b, a in zip(bars, aucs):
-        ax.text(a + 0.004, b.get_y() + b.get_height() / 2, f"{a:.3f}",
-                va="center", fontsize=11, fontweight="bold")
-    ax.set_xlim(0.5, max(aucs) + 0.05)
-    ax.set_xlabel("Test ROC-AUC")
-    ax.set_title("Model comparison (held-out test set)")
+    aucs    = [comparison[n]["auc"]    for n in names]
+    pr_aucs = [comparison[n].get("pr_auc", 0) for n in names]
+    n = len(names)
+    y = np.arange(n)
+    height = 0.35
+    bar_colors = [NAVY, TEAL, AMBER, "#5b4fcf"]   # up to 4 models
+    fig, ax = plt.subplots(figsize=(8, max(4.2, n * 1.1)))
+    ax.barh(y + height / 2, aucs, height, color=[bar_colors[i % len(bar_colors)] for i in range(n)],
+            label="ROC-AUC")
+    ax.barh(y - height / 2, pr_aucs, height,
+            color=[bar_colors[i % len(bar_colors)] for i in range(n)],
+            alpha=0.45, hatch="//", label="PR-AUC")
+    for i, (a, p) in enumerate(zip(aucs, pr_aucs)):
+        ax.text(a + 0.003, y[i] + height / 2, f"{a:.3f}", va="center", fontsize=10, fontweight="bold")
+        ax.text(p + 0.003, y[i] - height / 2, f"{p:.3f}", va="center", fontsize=10)
+    ax.set_yticks(y)
+    ax.set_yticklabels(names)
+    ax.set_xlim(0, max(aucs) + 0.10)
+    ax.set_xlabel("Score (higher = better)")
+    ax.set_title("Model comparison: ROC-AUC and PR-AUC (held-out test set)")
+    ax.legend(frameon=False, loc="lower right")
     return _save(fig, "model_comparison.png")
 
 
@@ -66,19 +81,34 @@ def fig_calibration(mp_raw, fp_raw, mp_cal, fp_cal):
     return _save(fig, "calibration.png")
 
 
-def fig_capture(cap_evar, cap_score, cap_rand):
-    fig, ax = plt.subplots(figsize=(7, 4.8))
-    ax.plot(cap_evar["frac_contacted"] * 100, cap_evar["frac_churn_captured"] * 100,
-            color=NAVY, lw=2.5, label="Rank by EVaR (value-weighted)")
-    ax.plot(cap_score["frac_contacted"] * 100, cap_score["frac_churn_captured"] * 100,
-            color=TEAL, lw=2, label="Rank by churn probability")
+def fig_capture(cap_evar, cap_score, cap_rand,
+                cap_rev=None, cap_rule=None):
+    """Capture curve with all four baselines (guideline §12).
+
+    - Random (weak baseline)
+    - Revenue-only (common business baseline)
+    - Rule-based heuristic (simple operational baseline)
+    - Churn probability (ML baseline)
+    - EVaR model (proposed solution)
+    """
+    fig, ax = plt.subplots(figsize=(8, 5.2))
     ax.plot(cap_rand["frac_contacted"] * 100, cap_rand["frac_churn_captured"] * 100,
-            "--", color=GREY, lw=1.5, label="Random (no model)")
-    ax.axvline(20, color=AMBER, ls=":", lw=1.5)
+            "--", color=GREY, lw=1.4, label="Random (no model)")
+    if cap_rev is not None:
+        ax.plot(cap_rev["frac_contacted"] * 100, cap_rev["frac_churn_captured"] * 100,
+                ":", color=AMBER, lw=1.8, label="Revenue-only (business baseline)")
+    if cap_rule is not None:
+        ax.plot(cap_rule["frac_contacted"] * 100, cap_rule["frac_churn_captured"] * 100,
+                "-.", color="#c0392b", lw=1.8, label="Rule-based heuristic")
+    ax.plot(cap_score["frac_contacted"] * 100, cap_score["frac_churn_captured"] * 100,
+            color=TEAL, lw=2, label="Churn probability (ML baseline)")
+    ax.plot(cap_evar["frac_contacted"] * 100, cap_evar["frac_churn_captured"] * 100,
+            color=NAVY, lw=2.8, label="EVaR model (proposed)")
+    ax.axvline(20, color=AMBER, ls=":", lw=1.5, alpha=0.7)
     ax.set_xlabel("% of customer base contacted")
     ax.set_ylabel("% of churners captured")
-    ax.set_title("Capture curve: who to contact first")
-    ax.legend(frameon=False, loc="lower right")
+    ax.set_title("Capture curve: four baselines vs EVaR model")
+    ax.legend(frameon=False, loc="lower right", fontsize=10)
     return _save(fig, "capture_curve.png")
 
 
@@ -172,3 +202,46 @@ def fig_personas(personas: dict):
         ax.text(b.get_x() + b.get_width() / 2, c + 0.5, f"{c:.0f}%",
                 ha="center", fontweight="bold", fontsize=10)
     return _save(fig, "personas.png")
+
+
+def fig_ablation(ablation: list[dict]):
+    """Feature-group ablation table visualised as a dot-plot.
+
+    Guideline §7: shows AUC improvement per feature group added, making each
+    engineering choice directly defensible to reviewers.
+    """
+    labels = [r["version"] for r in ablation]
+    aucs   = [r["roc_auc"] for r in ablation]
+    pr_aucs = [r["pr_auc"] for r in ablation]
+    n = len(labels)
+    y = np.arange(n)
+
+    fig, ax = plt.subplots(figsize=(9, max(4, n * 0.9)))
+    ax.scatter(aucs, y, color=NAVY, s=90, zorder=5, label="ROC-AUC")
+    ax.scatter(pr_aucs, y, color=TEAL, s=70, marker="D", zorder=5, label="PR-AUC")
+
+    # Draw delta arrows between consecutive ROC-AUC points.
+    for i in range(1, n):
+        delta = aucs[i] - aucs[i - 1]
+        color = TEAL if delta >= 0 else "#c0392b"
+        sign = "+" if delta >= 0 else ""
+        ax.annotate("", xy=(aucs[i], y[i]), xytext=(aucs[i - 1], y[i - 1]),
+                    arrowprops=dict(arrowstyle="->", color=color, lw=1.2))
+        ax.text(max(aucs[i], aucs[i - 1]) + 0.002,
+                (y[i] + y[i - 1]) / 2,
+                f"{sign}{delta:.4f}", fontsize=9, color=color, va="center")
+
+    for i, (a, p) in enumerate(zip(aucs, pr_aucs)):
+        ax.text(a + 0.001, y[i] + 0.18, f"{a:.4f}", fontsize=9, color=NAVY)
+        ax.text(p - 0.001, y[i] - 0.22, f"{p:.4f}", fontsize=9, color=TEAL, ha="right")
+
+    ax.set_yticks(y)
+    ax.set_yticklabels(labels, fontsize=10)
+    ax.set_xlabel("Score")
+    ax.set_title("Ablation: AUC gain per feature group (guideline §7)")
+    ax.legend(frameon=False)
+    x_min = min(min(aucs), min(pr_aucs)) - 0.02
+    x_max = max(max(aucs), max(pr_aucs)) + 0.04
+    ax.set_xlim(x_min, x_max)
+    ax.invert_yaxis()
+    return _save(fig, "ablation.png")
