@@ -60,12 +60,13 @@ def img(path,x,y,maxw,maxh):
     w,h=iw*rr,ih*rr
     c.drawImage(ImageReader(path),x+(maxw-w)/2,y+(maxh-h)/2,w,h,mask="auto")
 
+TOTAL=17
 def header(title,kicker,num):
     rect(0,H-92,W,92,WHITE)
     rect(80,H-92,6,52,ORANGE)
     text(100,H-52,kicker,13,ORANGE,"Helvetica-Bold")
     text(100,H-80,title,24,NAVY,"Helvetica-Bold")
-    text(W-80,H-78,f"{num} / 15",12,MUTE,"Helvetica",align="right")
+    text(W-80,H-78,f"{num} / {TOTAL}",12,MUTE,"Helvetica",align="right")
     rect(80,H-100,W-160,1.4,LINE)
 
 def footer(cite=None):
@@ -91,8 +92,8 @@ rect(0,0,W,H,NAVY); rect(0,0,W,8,ORANGE)
 rect(80,H-180,70,6,ORANGE)
 text(80,H-240,"Winning Back the Base",46,WHITE,"Helvetica-Bold")
 text(80,H-292,"A Value-Based Customer Retention Strategy for Company A",23,HexColor("#cbd5e1"))
-wrap(80,H-360,"Turning 100,000 customer records into a quantified, ROI-positive retention program — "
-     "targeting not just who will churn, but who is most valuable to keep.",16,HexColor("#94a3b8"),
+wrap(80,H-360,"Turning 100,000 customer records into a quantified retention program — targeting not just "
+     "who will churn, but who is most valuable to keep, then proving ROI with a paid A/B pilot.",16,HexColor("#94a3b8"),
      leading=24,maxw=740)
 rect(900,H-470,300,300,CARD,r=18)
 text(925,H-222,f"{BEST_AUC:.3f}",42,ORANGE,"Helvetica-Bold")
@@ -115,6 +116,8 @@ y=bullet(100,y-12,"What the data says","Churn is predictable and concentrated. T
        "handsets - devices past ~12 months churn at 54-58% vs ~42% when new - a lever Company A controls.")
 y=bullet(100,y-12,"Our solution","A monthly value-based targeting engine: rank customers by Expected Value-at-Risk "
        "(P(churn) x customer value), then make proactive, persona-specific retention offers.")
+y=bullet(100,y-12,"Why it works","The model is moderately predictive (AUC ~0.69) - but the value comes from "
+       "value-weighted targeting, calibration, fairness and A/B validation, not from over-claiming accuracy.",color=TEAL)
 rect(720,H-470,470,300,WHITE,r=16); rect(720,H-216,470,46,NAVY,r=16)
 text(744,H-200,"What it delivers - per 1,000,000 subscribers",13.5,WHITE,"Helvetica-Bold")
 rows=[("Best model",f"{BEST} · AUC {BEST_AUC:.3f}"),
@@ -220,10 +223,10 @@ c.showPage()
 page_bg(); header("Modelling approach: rigorous, reproducible, honest","METHODOLOGY",8)
 steps=[("01","Clean & engineer","Drop 9 high-missing + 4 protected fields; impute, encode; engineer 7 features "
         f"(usage trend, overage share, handset months...). {R['n_features_model']} model features."),
-       ("02","Train 4 model families","Logistic Regression (baseline), Random Forest, XGBoost and LightGBM - "
-        "from interpretable to high-performance."),
-       ("03","Validate & calibrate","75/25 stratified split + 5-fold CV on the winner; probabilities calibrated "
-        "and prior-shifted to the 22% operating base rate."),
+       ("02","Benchmark + ensemble","4 model families (LogReg, RF, XGBoost, LightGBM) plus soft-voting & "
+        "stacking ensembles - judged on revenue capture, not AUC alone."),
+       ("03","Validate & adjust","75/25 stratified split + 5-fold CV; isotonic-checked reliability (ECE "
+        f"{R['calibration_metrics']['ece_raw']*100:.1f}%); prior-adjusted to the 22% base rate, pilot-calibrated."),
        ("04","Rank by value","Convert to Expected Value-at-Risk; profit-curve sets the contact threshold; "
         "simulate vs random and churn-only baselines.")]
 for i,(n,h,b) in enumerate(steps):
@@ -259,9 +262,14 @@ for m in order:
     for v,w,j in zip(vals,cw,range(5)):
         text(cx+10,yy,v,11.5,NAVY if best else INK,"Helvetica-Bold" if (best or j==0) else "Helvetica"); cx+=w
     rect(tx,yy-12,sum(cw),1,LINE); yy-=42
-wrap(690,yy-2,f"How to read AUC: 0.5 = guessing, 1.0 = perfect. At {BEST_AUC:.3f} the model ranks a "
-     "churner above a non-churner ~69% of the time - enough to target retention spend profitably. Both gradient-"
-     "boosted models clearly beat the linear baseline.",12,SLATE,leading=17,maxw=490)
+en=R["ensemble"]
+wrap(690,yy-2,f"How to read AUC: 0.5 = guessing, 1.0 = perfect. At {BEST_AUC:.3f} the model is moderately "
+     "predictive - it ranks a churner above a non-churner ~69% of the time. We do not over-sell this: the "
+     "payoff comes from value-weighted targeting, not raw accuracy.",11.5,SLATE,leading=16,maxw=490)
+rect(690,108,490,70,HexColor("#f0fdf4"),r=10); rect(690,108,6,70,GREEN)
+wrap(712,158,f"Ensembles tested honestly: soft-voting & stacking reached AUC {en['Soft Voting']['auc']:.4f} "
+     f"(+{R['ensemble_auc_gain']:.4f}) - below our 0.003 bar - so we keep XGBoost for simpler, governable deployment.",
+     11,INK,"Helvetica-Bold",leading=14.5,maxw=450)
 footer("Source: held-out test set (25% of 100,000), Company A dataset.")
 c.showPage()
 
@@ -273,10 +281,11 @@ sh=list(R["shap_top"].items())
 y=H-150
 y=bullet(985,y,"Explainable (SHAP)",f"The top churn drivers are {sh[0][0]}, {sh[1][0]} and {sh[2][0]} - all "
        "behaviour Company A can act on. No protected attribute appears.",color=ORANGE,maxw=210)
-y=bullet(985,y-14,"Calibrated",f"Predicted probabilities track observed churn along the 45deg line, so EVaR dollar "
-       "figures are trustworthy - not just rankings.",color=TEAL,maxw=210)
+cm=R["calibration_metrics"]
+y=bullet(985,y-14,"Well-calibrated",f"Reliability error is only ECE {cm['ece_raw']*100:.1f}% - probabilities already "
+       "track reality; isotonic confirms it. We still prior-adjust 50/50->22% for dollar scale.",color=TEAL,maxw=210)
 y=bullet(985,y-14,"Actionable","Because drivers are controllable, every score maps to a concrete offer.",color=BLUE,maxw=210)
-footer("Source: SHAP values on held-out set; reliability curve (10 bins) after prior-shift calibration.")
+footer("Source: SHAP values on held-out set; reliability curve (10 bins), isotonic-checked; ECE/Brier reported.")
 c.showPage()
 
 # ============================================================ SLIDE 11 — DIFFERENTIATOR (EVaR)
@@ -304,10 +313,10 @@ img(f"{FIG}/10_personas.png",90,160,560,420)
 P=R["personas"]
 # label personas from real cluster stats
 def label_persona(p):
-    if p["handset_months"]>=18: return ("Aging-Handset","Old device, modest spend","Proactive upgrade / trade-in",ORANGE)
-    if p["rev"]>=120: return ("High-Value Power User","Top spend & usage","White-glove retention, protect margin",TEAL)
-    if p["overage_share"]>=0.3: return ("Bill-Shock / Overage","High bill, heavy overage","Right-size plan + autopay discount",REDC)
-    return ("New / Mainstream","Newer, mid-spend, largest group","Onboarding nudges + loyalty perks",BLUE)
+    if p["handset_months"]>=18: return ("Upgrade-Ready Switchers","Aging device, modest spend","Proactive upgrade / trade-in",ORANGE)
+    if p["rev"]>=120: return ("High-Value Protect-and-Hold","Top spend & usage","White-glove retention, protect margin",TEAL)
+    if p["overage_share"]>=0.3: return ("Bill-Shock Frustrated","High bill, heavy overage","Right-size plan + autopay discount",REDC)
+    return ("Low-Engagement Flight Risks","Newer, mid-spend, largest group","Onboarding nudges + loyalty perks",BLUE)
 yy=H-170
 seen=set()
 for p in P:
@@ -325,8 +334,38 @@ for p in P:
 footer("Source: K-means (k=4) on standardised behavioural features of the customer base, Company A dataset.")
 c.showPage()
 
-# ============================================================ SLIDE 13 — BUSINESS CASE
-page_bg(); header("The business case: strong base/bull upside, bear flags the floor","QUANTIFIED IMPACT  (per 1M subscribers / yr)",13)
+# ============================================================ SLIDE 13 — TREATMENT DESIGN
+page_bg(); header("From segment to action: the treatment playbook","RETENTION OFFER DESIGN",13)
+wrap(100,H-148,"Each persona maps to a specific offer with an explicit cost, an expected save-rate, and a "
+     "margin guardrail - so spend is disciplined and never margin-negative.",13.5,SLATE,leading=18,maxw=1080)
+cols=[("Persona",250),("Problem",235),("Offer",235),("Cost",95),("Save rate",115),("Guardrail",150)]
+rows=[("Upgrade-Ready Switchers","Aging device triggers shopping","Upgrade / trade-in","$50-120","Medium","Only high-EVaR",ORANGE),
+      ("Bill-Shock Frustrated","Overage frustration","Plan right-size + autopay","$10-30","High","No margin-negative plan",REDC),
+      ("Low-Engagement Flight Risks","Usage collapse, drifting away","Loyalty call / perk","$15-40","Low-Med","Test vs holdout",BLUE),
+      ("High-Value Protect-and-Hold","Valuable but at-risk","Light loyalty + concierge","$5-15","Low","Avoid over-discount",TEAL)]
+tx=100; ty=H-250
+cx=tx; rect(tx,ty,sum(w for _,w in cols),34,NAVY)
+for name,w in cols:
+    text(cx+12,ty+11,name,11.5,WHITE,"Helvetica-Bold"); cx+=w
+yy=ty-2
+for r in rows:
+    yy-=58
+    rect(tx,yy,sum(w for _,w in cols),58,WHITE); rect(tx,yy,6,58,r[6])
+    cx=tx; vals=r[:6]
+    for (name,w),v,i in zip(cols,vals,range(6)):
+        fnt="Helvetica-Bold" if i==0 else "Helvetica"
+        col=INK if i==0 else SLATE
+        wrap(cx+14,yy+36,v,10.3,col,fnt,leading=12.5,maxw=w-18)
+        cx+=w
+    rect(tx,yy,sum(w for _,w in cols),1,LINE)
+rect(100,92,1080,52,HexColor("#f0fdf4"),r=10); rect(100,92,6,52,GREEN)
+wrap(124,128,"Every offer is gated by Expected Value-at-Risk and validated against a holdout - we only spend "
+     "where the expected saved margin exceeds the offer cost.",11.5,INK,"Helvetica-Bold",leading=15,maxw=1040)
+footer("Offer costs are planning ranges to be calibrated in the pilot; save-rates validated by A/B holdout.")
+c.showPage()
+
+# ============================================================ SLIDE 14 — BUSINESS CASE
+page_bg(); header("The business case: strong base/bull upside, bear flags the floor","QUANTIFIED IMPACT  (per 1M subscribers / yr)",14)
 img(f"{FIG}/08_profit_curve.png",70,150,560,420)
 img(f"{FIG}/09_scenarios.png",650,150,560,420)
 chip(70,86,"Net benefit / yr", money(base["net_benefit"]), GREEN, w=250, h=84)
@@ -338,7 +377,7 @@ footer(f"Base case: 22% annual churn, 50% margin, 30% save-rate, ${base['offer']
 c.showPage()
 
 # ============================================================ SLIDE 14 — QUOTATION (THE ASK)
-page_bg(); header("Our proposal & quotation","THE ASK",14)
+page_bg(); header("Our proposal & quotation","THE ASK",16)
 wrap(100,H-148,"We propose a 12-week build of the retention engine, then an ongoing managed service. "
      "Our fee is a small fraction of the value we protect.",14,SLATE,leading=20,maxw=1040)
 ph=[("Phase 1 · Build (wk 1-6)","Data pipeline, model, calibration, EVaR scoring, persona logic",BLUE),
@@ -366,13 +405,14 @@ footer("Fee illustrative for a PoC engagement; scales with subscriber base. Valu
 c.showPage()
 
 # ============================================================ SLIDE 15 — RISKS, FAIRNESS & REFERENCES
-page_bg(); header("Risks, fairness & references","GOVERNANCE & SOURCES",15)
+page_bg(); header("Risks, fairness & references","GOVERNANCE & SOURCES",17)
 img(f"{FIG}/11_fairness.png",90,250,470,300)
 f=R["fairness"]
-text(325,232,f"Removing protected attributes changes AUC by {f['auc_delta']:+.4f}",10.5,NAVY,"Helvetica-Bold",align="center")
+improve=f["auc_without_protected"]-f["auc_with_protected"]
+text(325,232,f"AUC {f['auc_with_protected']:.4f} -> {f['auc_without_protected']:.4f}  ({improve:+.4f}, no cost)",10.5,NAVY,"Helvetica-Bold",align="center")
 y=H-150
-y=bullet(600,y,"Fairness by design",f"We exclude ethnicity, marital status, income & credit class. The cost is "
-       f"{abs(f['auc_delta'])*100:.2f} AUC points (essentially zero) - so we lose nothing by being fair.",color=BLUE,maxw=560)
+y=bullet(600,y,"Fairness by design",f"We exclude ethnicity, marital status, income & credit class. Removing them does "
+       f"NOT hurt performance - AUC moves {f['auc_with_protected']:.4f} -> {f['auc_without_protected']:.4f} ({improve:+.4f}), a negligible change.",color=BLUE,maxw=560)
 y=bullet(600,y-10,"Validate before scaling","The 50/50 sample inflates apparent churn; the A/B pilot calibrates real "
        "save-rates and ROI - and tells us whether we are in the bear or bull scenario.",color=ORANGE,maxw=560)
 y=bullet(600,y-10,"Monitor for drift","Re-train on fresh data and watch feature drift; a stale model silently "

@@ -20,11 +20,12 @@ import os, json, warnings, numpy as np, pandas as pd
 warnings.filterwarnings("ignore")
 from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, StackingClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
-from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score
-from sklearn.calibration import calibration_curve
+from sklearn.metrics import (roc_auc_score, accuracy_score, precision_score, recall_score,
+                             f1_score, brier_score_loss)
+from sklearn.calibration import calibration_curve, CalibratedClassifierCV
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 
@@ -169,10 +170,37 @@ R["cv_auc_mean"], R["cv_auc_std"] = round(cv.mean(), 4), round(cv.std(), 4)
 
 p_best = proba[best_name]
 
-# ----------------------------------------------------------------- calibration (reliability on sample scale)
-frac_pos, mean_pred = calibration_curve(yte, p_best, n_bins=10, strategy="quantile")
-R["calibration"] = {"mean_pred": [round(x, 4) for x in mean_pred],
-                    "frac_pos": [round(x, 4) for x in frac_pos]}
+# ----------------------------------------------------------------- REAL calibration (isotonic) + Brier + ECE
+def expected_calibration_error(y_true, p, n_bins=10):
+    fp, mp = calibration_curve(y_true, p, n_bins=n_bins, strategy="quantile")
+    # weight each bin by its share of points
+    bins = np.quantile(p, np.linspace(0, 1, n_bins + 1))
+    idx = np.clip(np.digitize(p, bins[1:-1]), 0, len(fp) - 1)
+    w = np.array([(idx == i).mean() for i in range(len(fp))])
+    return float(np.sum(w * np.abs(fp - mp)))
+
+# Fit isotonic calibration on the winner via 3-fold CV (proper held-out calibration).
+Xcal = Xtr_s if best_name == "Logistic Regression" else Xtr
+Xcal_te = Xte_s if best_name == "Logistic Regression" else Xte
+cal = CalibratedClassifierCV(models[best_name], method="isotonic", cv=3)
+cal.fit(Xcal, ytr)
+p_cal = cal.predict_proba(Xcal_te)[:, 1]
+R["calibration_metrics"] = {
+    "brier_raw": round(brier_score_loss(yte, p_best), 4),
+    "brier_calibrated": round(brier_score_loss(yte, p_cal), 4),
+    "ece_raw": round(expected_calibration_error(yte.values, p_best), 4),
+    "ece_calibrated": round(expected_calibration_error(yte.values, p_cal), 4),
+    "auc_calibrated": round(roc_auc_score(yte, p_cal), 4),
+}
+# reliability curves (raw vs isotonic-calibrated), sample scale
+fr_raw, mp_raw = calibration_curve(yte, p_best, n_bins=10, strategy="quantile")
+fr_cal, mp_cal = calibration_curve(yte, p_cal, n_bins=10, strategy="quantile")
+R["calibration"] = {"mean_pred": [round(x, 4) for x in mp_raw],
+                    "frac_pos": [round(x, 4) for x in fr_raw],
+                    "mean_pred_cal": [round(x, 4) for x in mp_cal],
+                    "frac_pos_cal": [round(x, 4) for x in fr_cal]}
+# Use the isotonic-calibrated probabilities downstream (better reliability), then prior-shift.
+p_best = p_cal
 
 # prior-shift correction: sample prior 0.5 -> assumed population prior PI
 PI = 0.22
@@ -200,6 +228,36 @@ def capture(idx, frac):
 R["targeting"] = {}
 for key, idx in order.items():
     R["targeting"][key] = {str(f): capture(idx, f) for f in (0.1, 0.2, 0.3)}
+
+# ----------------------------------------------------------------- ensemble experiment
+# Judge ensembles on BOTH AUC and revenue capture@20% (business value), not AUC alone.
+def rev_capture_top(p, frac=0.20):
+    idx = np.argsort(-(prior_shift(np.clip(p, 1e-6, 1 - 1e-6), 0.22) * annual_rev))
+    k = int(len(idx) * frac); sel = idx[:k]
+    return round(annual_rev[sel][yte_arr[sel] == 1].sum() / tot_rev_risk, 4)
+
+ens = {}
+# single models (reference)
+for name in ["XGBoost", "LightGBM", "Random Forest"]:
+    ens[name] = {"auc": res[name]["auc"], "rev20": rev_capture_top(proba[name])}
+# soft voting (weight the two strongest boosters more)
+p_soft = 0.50 * proba["XGBoost"] + 0.40 * proba["LightGBM"] + 0.10 * proba["Random Forest"]
+ens["Soft Voting"] = {"auc": round(roc_auc_score(yte, p_soft), 4), "rev20": rev_capture_top(p_soft)}
+# stacking with a logistic meta-learner
+stack = StackingClassifier(
+    estimators=[("xgb", models["XGBoost"]), ("lgb", models["LightGBM"]),
+                ("rf", models["Random Forest"])],
+    final_estimator=LogisticRegression(max_iter=2000),
+    stack_method="predict_proba", cv=3, n_jobs=-1)
+stack.fit(Xtr, ytr)
+p_stack = stack.predict_proba(Xte)[:, 1]
+ens["Stacking"] = {"auc": round(roc_auc_score(yte, p_stack), 4), "rev20": rev_capture_top(p_stack)}
+R["ensemble"] = ens
+# decision: only promote an ensemble if it beats the single winner by >= 0.003 AUC
+best_single_auc = max(res[n]["auc"] for n in res)
+gain = max(ens["Soft Voting"]["auc"], ens["Stacking"]["auc"]) - best_single_auc
+R["ensemble_auc_gain"] = round(gain, 4)
+R["ensemble_decision"] = ("promote" if gain >= 0.003 else "keep_single")
 
 # ----------------------------------------------------------------- profit-curve threshold optimisation
 # Population-scaled: expected net value of contacting customer i =
@@ -299,6 +357,8 @@ print("rows", R["n_rows"], "| model features", R["n_features_model"])
 print("FAIRNESS auc with/without protected:", R["fairness"])
 for k, v in res.items(): print(" ", k, v["auc"])
 print("best", best_name, "CV", R["cv_auc_mean"], "+/-", R["cv_auc_std"])
+print("CALIBRATION", R["calibration_metrics"])
+print("ENSEMBLE", {k: v for k, v in R["ensemble"].items()}, "| gain", R["ensemble_auc_gain"], "->", R["ensemble_decision"])
 print("EVaR rev capture@20%", evar_rev20, "vs score", score_rev20, "=", R["business"]["evar_vs_score_x"], "x")
 print("optimal contact frac", R["optimal_contact_frac"], "net@opt", R["optimal_net_1M"])
 print("BASE net", R["business"]["base"]["net_benefit"], "ROI", R["business"]["base"]["roi"])

@@ -70,14 +70,17 @@ ax.set_title("Why customers leave: SHAP feature impact (XGBoost)",fontweight="bo
 ax.set_xlabel("Mean |SHAP value| (impact on churn odds)")
 save(fig,"05_shap.png")
 
-# ---- 6. calibration curve ----
-cal=R["calibration"]
+# ---- 6. calibration curve (raw vs isotonic) + Brier/ECE ----
+cal=R["calibration"]; cm=R["calibration_metrics"]
 fig,ax=plt.subplots(figsize=(6.8,5))
 ax.plot([0,1],[0,1],ls="--",color=GRAY,label="Perfect calibration")
-ax.plot(cal["mean_pred"],cal["frac_pos"],marker="o",color=ORANGE,lw=2.5,label="Model")
+ax.plot(cal["mean_pred"],cal["frac_pos"],marker="o",color=ORANGE,lw=2.5,label="Raw XGBoost")
+ax.plot(cal["mean_pred_cal"],cal["frac_pos_cal"],marker="s",color=TEAL,lw=2.2,label="Isotonic-calibrated")
 ax.set_xlabel("Predicted probability"); ax.set_ylabel("Observed churn rate")
-ax.set_title("Probabilities are well-calibrated",fontweight="bold",color=NAVY)
-ax.legend(loc="upper left"); save(fig,"06_calibration.png")
+ax.set_title("Reliability: probabilities track reality closely",fontweight="bold",color=NAVY)
+ax.text(0.04,0.92,f"ECE {cm['ece_raw']*100:.1f}%  |  Brier {cm['brier_raw']:.3f}",
+        transform=ax.transAxes,fontsize=10.5,color=NAVY,fontweight="bold")
+ax.legend(loc="lower right"); save(fig,"06_calibration.png")
 
 # ---- 7. EVaR vs score vs random (rev-at-risk captured @20%) ----
 ev=R["targeting"]["by_evar"]["0.2"]["rev_capture"]
@@ -140,7 +143,25 @@ bars=ax.bar(["With protected\nattributes","Protected\nattributes removed"],
 for bb,v in zip(bars,[f["auc_with_protected"],f["auc_without_protected"]]):
     ax.text(bb.get_x()+bb.get_width()/2,v+.002,f"{v:.4f}",ha="center",fontweight="bold",color=NAVY)
 ax.set_ylim(.6,.71)
-ax.set_title(f"Dropping protected attributes costs {f['auc_delta']:+.4f} AUC",fontweight="bold",color=NAVY)
+improve = f["auc_without_protected"] - f["auc_with_protected"]
+ax.set_title(f"Removing protected attributes: {improve:+.4f} AUC (no cost)",fontweight="bold",color=NAVY)
 ax.set_ylabel("ROC-AUC"); save(fig,"11_fairness.png")
+
+# ---- 12. ensemble experiment: AUC vs revenue capture@20% ----
+en=R["ensemble"]; enames=list(en.keys())
+aucs=[en[n]["auc"] for n in enames]; revs=[en[n]["rev20"] for n in enames]
+x=np.arange(len(enames)); w=0.38
+fig,ax=plt.subplots(figsize=(8.6,4.8))
+ax2=ax.twinx()
+b1=ax.bar(x-w/2,aucs,w,color=NAVY,label="ROC-AUC")
+b2=ax2.bar(x+w/2,revs,w,color=ORANGE,label="Rev-at-risk capture @20%")
+ax.set_xticks(x); ax.set_xticklabels(enames,rotation=12,ha="right",fontsize=10.5)
+ax.set_ylim(.66,.70); ax2.set_ylim(.40,.46)
+ax.set_ylabel("ROC-AUC",color=NAVY); ax2.set_ylabel("Revenue capture @20%",color=ORANGE)
+ax2.yaxis.set_major_formatter(PercentFormatter(1.0)); ax2.grid(False)
+for xi,a in zip(x,aucs): ax.text(xi-w/2,a+.0008,f"{a:.4f}",ha="center",fontsize=8.6,fontweight="bold",color=NAVY)
+ax.set_title(f"Ensembles tested: +{R['ensemble_auc_gain']:.4f} AUC -> keep XGBoost (simpler to govern)",
+             fontweight="bold",color=NAVY,fontsize=12)
+save(fig,"12_ensemble.png")
 
 print("ALL CHARTS DONE")

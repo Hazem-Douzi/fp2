@@ -110,6 +110,13 @@
   "best_model": "XGBoost",
   "cv_auc_mean": 0.695,
   "cv_auc_std": 0.003,
+  "calibration_metrics": {
+    "brier_raw": 0.2213,
+    "brier_calibrated": 0.2212,
+    "ece_raw": 0.0068,
+    "ece_calibrated": 0.0079,
+    "auc_calibrated": 0.6919
+  },
   "calibration": {
     "mean_pred": [
       0.2101,
@@ -134,37 +141,61 @@
       0.616,
       0.6608,
       0.7988
+    ],
+    "mean_pred_cal": [
+      0.2058,
+      0.3108,
+      0.3822,
+      0.4313,
+      0.4763,
+      0.5207,
+      0.566,
+      0.6103,
+      0.6619,
+      0.7954
+    ],
+    "frac_pos_cal": [
+      0.205,
+      0.3031,
+      0.3886,
+      0.4222,
+      0.4848,
+      0.5306,
+      0.5526,
+      0.6004,
+      0.6679,
+      0.8032
     ]
   },
   "assumed_population_churn_annual": 0.22,
-  "pop_prob_mean": 0.2408,
+  "pop_prob_mean": 0.2411,
   "targeting": {
     "by_evar": {
       "0.1": {
-        "cust_capture": 0.1331,
-        "rev_capture": 0.2817
+        "cust_capture": 0.1336,
+        "rev_capture": 0.2846
       },
       "0.2": {
-        "cust_capture": 0.2568,
-        "rev_capture": 0.4374
+        "cust_capture": 0.2562,
+        "rev_capture": 0.438
       },
       "0.3": {
-        "cust_capture": 0.3729,
-        "rev_capture": 0.5623
+        "cust_capture": 0.3723,
+        "rev_capture": 0.5627
       }
     },
     "by_score": {
       "0.1": {
-        "cust_capture": 0.1612,
-        "rev_capture": 0.1444
+        "cust_capture": 0.1621,
+        "rev_capture": 0.1442
       },
       "0.2": {
-        "cust_capture": 0.2945,
-        "rev_capture": 0.2828
+        "cust_capture": 0.2968,
+        "rev_capture": 0.2821
       },
       "0.3": {
-        "cust_capture": 0.4188,
-        "rev_capture": 0.4048
+        "cust_capture": 0.418,
+        "rev_capture": 0.4024
       }
     },
     "by_random": {
@@ -182,90 +213,114 @@
       }
     }
   },
+  "ensemble": {
+    "XGBoost": {
+      "auc": 0.6916,
+      "rev20": 0.4374
+    },
+    "LightGBM": {
+      "auc": 0.6896,
+      "rev20": 0.4367
+    },
+    "Random Forest": {
+      "auc": 0.6755,
+      "rev20": 0.4424
+    },
+    "Soft Voting": {
+      "auc": 0.6921,
+      "rev20": 0.4399
+    },
+    "Stacking": {
+      "auc": 0.6921,
+      "rev20": 0.4363
+    }
+  },
+  "ensemble_auc_gain": 0.0005,
+  "ensemble_decision": "keep_single",
   "profit_curve": [
     {
       "frac": 0.05,
-      "net": 5940293
+      "net": 5862803
     },
     {
       "frac": 0.1,
-      "net": 9423702
+      "net": 9341840
     },
     {
       "frac": 0.15,
-      "net": 12068471
+      "net": 12002514
     },
     {
       "frac": 0.2,
-      "net": 14192432
+      "net": 14146492
     },
     {
       "frac": 0.25,
-      "net": 15928564
+      "net": 15915759
     },
     {
       "frac": 0.3,
-      "net": 17386246
+      "net": 17408387
     },
     {
       "frac": 0.35,
-      "net": 18613299
+      "net": 18666932
     },
     {
       "frac": 0.4,
-      "net": 19638087
+      "net": 19724853
     },
     {
       "frac": 0.45,
-      "net": 20491625
+      "net": 20604330
     },
     {
       "frac": 0.5,
-      "net": 21190224
+      "net": 21316758
     },
     {
       "frac": 0.55,
-      "net": 21745717
+      "net": 21877494
     },
     {
       "frac": 0.6,
-      "net": 22161587
+      "net": 22294732
     },
     {
       "frac": 0.65,
-      "net": 22443604
+      "net": 22571950
     },
     {
       "frac": 0.7,
-      "net": 22587740
+      "net": 22706154
     },
     {
       "frac": 0.75,
-      "net": 22593218
+      "net": 22697884
     },
     {
       "frac": 0.8,
-      "net": 22453154
+      "net": 22547983
     },
     {
       "frac": 0.85,
-      "net": 22155177
+      "net": 22245779
     },
     {
       "frac": 0.9,
-      "net": 21683043
+      "net": 21764179
     },
     {
       "frac": 0.95,
-      "net": 20982336
+      "net": 21056924
     },
     {
       "frac": 1.0,
-      "net": 19991338
+      "net": 20044142
     }
   ],
-  "optimal_contact_frac": 0.73,
-  "optimal_net_1M": 22608239,
+  "optimal_contact_frac": 0.72,
+  "optimal_net_1M": 22719813,
   "personas": [
     {
       "cluster": 2,
@@ -333,35 +388,35 @@
     "margin": 0.5,
     "target_frac": 0.2,
     "rev_at_risk": 155020800,
-    "evar_rev_capture20": 0.4374,
-    "evar_cust_capture20": 0.2568,
+    "evar_rev_capture20": 0.438,
+    "evar_cust_capture20": 0.2562,
     "evar_vs_score_x": 1.55,
     "bear": {
       "save_rate": 0.15,
       "offer": 40,
       "cac": 300,
-      "rev_protected": 10170915,
-      "net_benefit": -372223,
+      "rev_protected": 10184867,
+      "net_benefit": -371187,
       "roi": -0.05,
-      "saved_customers": 8474
+      "saved_customers": 8455
     },
     "base": {
       "save_rate": 0.3,
       "offer": 30,
       "cac": 350,
-      "rev_protected": 20341829,
-      "net_benefit": 10102995,
+      "rev_protected": 20369733,
+      "net_benefit": 10103087,
       "roi": 1.68,
-      "saved_customers": 16949
+      "saved_customers": 16909
     },
     "bull": {
       "save_rate": 0.4,
       "offer": 25,
       "cac": 400,
-      "rev_protected": 27122439,
-      "net_benefit": 17600580,
+      "rev_protected": 27159644,
+      "net_benefit": 17598062,
       "roi": 3.52,
-      "saved_customers": 22598
+      "saved_customers": 22546
     }
   },
   "clv": 1601.0,
@@ -369,8 +424,8 @@
     "setup_fee": 300000,
     "monthly_fee": 45000,
     "annual_fee": 840000,
-    "net_value_1M": 10102995,
+    "net_value_1M": 10103087,
     "pct_of_net": 8.3,
-    "client_keeps": 9262995
+    "client_keeps": 9263087
   }
 }
