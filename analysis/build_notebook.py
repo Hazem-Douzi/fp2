@@ -39,12 +39,12 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, StackingClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.metrics import (roc_auc_score, roc_curve, accuracy_score,
-                             precision_score, recall_score, f1_score)
-from sklearn.calibration import calibration_curve
+                             precision_score, recall_score, f1_score, brier_score_loss)
+from sklearn.calibration import calibration_curve, CalibratedClassifierCV
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 
@@ -178,14 +178,32 @@ cv=cross_val_score(best_model,Xcv,ytr,cv=StratifiedKFold(5,shuffle=True,random_s
 print(f"{best} 5-fold CV ROC-AUC = {cv.mean():.4f} +/- {cv.std():.4f}")
 p_best=proba[best]""")
 
-md("""## 6. Calibration & prior-shift correction
-The sample is oversampled (~50% churn) so raw probabilities are inflated. We (a) check the **reliability
-curve** and (b) apply **prior-shift correction** to map probabilities onto an assumed **22%/yr** population
-churn rate, so EVaR and the business case use believable numbers.""")
-code("""frac_pos,mean_pred=calibration_curve(yte,p_best,n_bins=10,strategy="quantile")
-fig,ax=plt.subplots(figsize=(6,6))
+md("""## 6. Calibration: reliability, Brier & ECE, then prior-shift
+Good *dollar* decisions need trustworthy probabilities, not just good ranking. We (a) measure the
+**Brier score** and **Expected Calibration Error (ECE)**, (b) fit an **isotonic** calibrator and confirm it
+doesn't materially improve on the raw model (i.e. the model is already well-calibrated), then (c) apply
+**prior-shift correction** to map the oversampled ~50% sample onto an assumed **22%/yr** population churn
+rate so EVaR and the business case use believable numbers.""")
+code("""def ece(y_true,p,n_bins=10):
+    fp,mp=calibration_curve(y_true,p,n_bins=n_bins,strategy="quantile")
+    bins=np.quantile(p,np.linspace(0,1,n_bins+1))
+    idx=np.clip(np.digitize(p,bins[1:-1]),0,len(fp)-1)
+    w=np.array([(idx==i).mean() for i in range(len(fp))])
+    return float(np.sum(w*np.abs(fp-mp)))
+
+Xcal = Xtr_s if best=="Logistic Regression" else Xtr
+Xcal_te = Xte_s if best=="Logistic Regression" else Xte
+cal=CalibratedClassifierCV(models[best],method="isotonic",cv=3).fit(Xcal,ytr)
+p_cal=cal.predict_proba(Xcal_te)[:,1]
+print(f"Brier  raw={brier_score_loss(yte,p_best):.4f}  isotonic={brier_score_loss(yte,p_cal):.4f}")
+print(f"ECE    raw={ece(yte.values,p_best)*100:.1f}%   isotonic={ece(yte.values,p_cal)*100:.1f}%")
+
+fr_r,mp_r=calibration_curve(yte,p_best,n_bins=10,strategy="quantile")
+fr_c,mp_c=calibration_curve(yte,p_cal,n_bins=10,strategy="quantile")
+fig,ax=plt.subplots(figsize=(6.5,6))
 ax.plot([0,1],[0,1],"--",color="#94a3b8",label="perfect")
-ax.plot(mean_pred,frac_pos,"o-",color="#0f2742",label=best)
+ax.plot(mp_r,fr_r,"o-",color="#e8833a",label=f"{best} (raw)")
+ax.plot(mp_c,fr_c,"s-",color="#2a9d8f",label="isotonic-calibrated")
 ax.set_xlabel("Mean predicted probability"); ax.set_ylabel("Observed frequency")
 ax.set_title("Reliability curve (sample scale)"); ax.legend(); plt.tight_layout(); plt.show()
 

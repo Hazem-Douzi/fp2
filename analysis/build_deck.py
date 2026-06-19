@@ -60,13 +60,15 @@ def img(path,x,y,maxw,maxh):
     w,h=iw*rr,ih*rr
     c.drawImage(ImageReader(path),x+(maxw-w)/2,y+(maxh-h)/2,w,h,mask="auto")
 
-TOTAL=17
-def header(title,kicker,num):
+TOTAL=15
+_SLIDE=[1]   # title slide is 1; content slides auto-increment
+def header(title,kicker,num=None):
+    n=_SLIDE[0]+1; _SLIDE[0]=n
     rect(0,H-92,W,92,WHITE)
     rect(80,H-92,6,52,ORANGE)
     text(100,H-52,kicker,13,ORANGE,"Helvetica-Bold")
     text(100,H-80,title,24,NAVY,"Helvetica-Bold")
-    text(W-80,H-78,f"{num} / {TOTAL}",12,MUTE,"Helvetica",align="right")
+    text(W-80,H-78,f"{n} / {TOTAL}",12,MUTE,"Helvetica",align="right")
     rect(80,H-100,W-160,1.4,LINE)
 
 def footer(cite=None):
@@ -107,7 +109,7 @@ text(80,46,"Author: [Omnicampus Account Name]   ·   June 2026",11,HexColor("#64
 c.showPage()
 
 # ============================================================ SLIDE 2 — EXECUTIVE SUMMARY
-page_bg(); header("Executive summary","THE ANSWER, UP FRONT",2)
+page_bg(); header("Executive summary","THE ANSWER, UP FRONT")
 text(100,H-148,"Company A loses customers faster than it can profitably replace them. We can fix that.",16.5,INK,"Helvetica-Bold")
 y=H-198
 y=bullet(100,y,"The problem","In a saturated market, ~95% of growth comes from switchers and re-acquiring a lost "
@@ -133,7 +135,7 @@ footer("Sources: Bain & Company; Harvard Business Review; analysis of Company A 
 c.showPage()
 
 # ============================================================ SLIDE 3 — MARKET ANALYSIS
-page_bg(); header("Market analysis: retention is the only profitable growth lever","MARKET ANALYSIS",3)
+page_bg(); header("Market analysis: retention is the only profitable growth lever","MARKET ANALYSIS")
 chip(100,H-250,"US wireless market (2025)",  "$344B", BLUE, w=250)
 chip(370,H-250,"Best-in-class monthly churn","1.0%", TEAL, w=250)
 chip(640,H-250,"Re-acquire vs. retain cost", "5-25x", ORANGE, w=250)
@@ -152,7 +154,7 @@ footer("Sources: industry market sizing 2025; Verizon/T-Mobile investor reports;
 c.showPage()
 
 # ============================================================ SLIDE 4 — CLIENT & DATA
-page_bg(); header("The client & the data","CLIENT & DATASET",4)
+page_bg(); header("The client & the data","CLIENT & DATASET")
 wrap(100,H-148,"Company A is a US wireless carrier facing elevated churn. We received two linked tables "
      "covering 100,000 customers - behavioural usage and customer profile - joined on Customer_ID.",
      14,SLATE,leading=20,maxw=1080)
@@ -173,54 +175,24 @@ wrap(126,154,"Data discipline: (1) the modelling sample is balanced ~50/50 by de
 footer("Source: Company A dataset (Client.csv + Record.csv), 100,000 customers.")
 c.showPage()
 
-# ============================================================ SLIDE 5 — EDA 1
-page_bg(); header("What the data reveals: who leaves, and why","EXPLORATORY DATA ANALYSIS  (1/2)",5)
-img(f"{FIG}/02_correlations.png",90,150,560,430)
-y=H-160
-y=bullet(700,y,"Equipment age is the #1 signal","Time on the same handset (eqpdays / handset_months) is the strongest "
-       "positive correlate of churn (+0.11) - phones age out and customers shop around.",color=ORANGE,maxw=470)
-y=bullet(700,y-12,"Investment buys loyalty","Higher handset price and higher recurring charge both correlate "
-       "negatively with churn - customers with newer, pricier phones stay.",color=TEAL,maxw=470)
-y=bullet(700,y-12,"Engagement matters","More minutes of use and completed calls track with lower churn; "
-       "a declining usage trend is an early-warning sign we engineered into the model.",color=BLUE,maxw=470)
-footer("Source: point-biserial correlations with churn flag, Company A dataset (n=100,000).")
-c.showPage()
-
-# ============================================================ SLIDE 6 — EDA 2
-page_bg(); header("The headline insight: the handset-age cliff","EXPLORATORY DATA ANALYSIS  (2/2)",6)
-img(f"{FIG}/03_handset.png",90,150,560,430)
+# ============================================================ EDA (combined)
+page_bg(); header("What the data reveals: the handset-age cliff","EXPLORATORY DATA ANALYSIS")
+img(f"{FIG}/03_handset.png",90,170,560,400)
 e=R["handset_bins"]
-y=H-160
-y=bullet(700,y,"A clear climb after ~12 months",
-       f"Churn rises from ~{e['6-12mo']['churn']*100:.0f}% (6-12 mo) to ~{e['12-18mo']['churn']*100:.0f}% past "
-       f"12 months and reaches ~{e['24mo+']['churn']*100:.0f}% beyond two years.",color=ORANGE,maxw=470)
-y=bullet(700,y-12,"This is an actionable lever","Unlike age or income, handset age is something Company A can "
-       "change - through proactive upgrade and trade-in offers timed to the cliff.",color=TEAL,maxw=470)
-y=bullet(700,y-12,"Real months, not guesses","Buckets are computed directly from days-on-handset in the data - "
-       "no assumed labels - so the timing of the intervention is evidence-based.",color=BLUE,maxw=470)
-footer("Source: churn rate by months-on-current-handset, Company A dataset.")
+y=H-158
+y=bullet(700,y,"Equipment age is the #1 signal","Time on the same handset is the strongest correlate of churn (+0.11). "
+       f"Churn climbs from ~{e['6-12mo']['churn']*100:.0f}% (6-12 mo) to ~{e['24mo+']['churn']*100:.0f}% beyond two years.",color=ORANGE,maxw=470)
+y=bullet(700,y-10,"An actionable lever","Unlike age or income, handset age is something Company A controls - via "
+       "proactive upgrade & trade-in offers timed to the ~12-month cliff.",color=TEAL,maxw=470)
+y=bullet(700,y-10,"Investment buys loyalty","Higher handset price and recurring charge correlate negatively with churn - "
+       "customers with newer, pricier phones stay.",color=BLUE,maxw=470)
+y=bullet(700,y-10,"Engagement matters","Declining minutes-of-use is an early-warning sign we engineered into the model "
+       "as a usage-trend feature.",color=GREEN,maxw=470)
+footer("Source: churn rate by months-on-handset & point-biserial correlations, Company A dataset (n=100,000).")
 c.showPage()
 
-# ============================================================ SLIDE 7 — PROBLEM & ML TASK
-page_bg(); header("Framing the business problem as an ML task","PROBLEM DEFINITION",7)
-rect(100,H-244,1080,84,HexColor("#eef2ff"),r=12); rect(100,H-244,6,84,BLUE)
-wrap(126,H-186,"Business question:  'Which customers are about to leave, how much revenue do they put at risk, "
-     "and what is the most cost-effective way to keep them?'",15,NAVY,"Helvetica-Bold",leading=22,maxw=1030)
-y=H-296
-y=bullet(100,y,"ML formulation","Supervised binary classification: predict P(churn) per customer from "
-       "behavioural + profile features, then calibrate to the real base rate.",color=BLUE,maxw=480)
-y=bullet(100,y-12,"But probability isn't enough","A $149/mo customer and a $42/mo customer are not equally worth "
-       "saving. We rank by Expected Value-at-Risk = P(churn) x customer value.",color=ORANGE,maxw=480)
-y=H-296
-y=bullet(640,y,"Primary metric: ROC-AUC","Ranking quality matters more than a single cutoff, because we act on "
-       "the highest-risk, highest-value customers first.",color=TEAL,maxw=470)
-y=bullet(640,y-12,"Success = profit, not accuracy","Judged by incremental margin + avoided re-acquisition cost from "
-       "a targeted campaign, validated by an A/B holdout.",color=GREEN,maxw=470)
-footer()
-c.showPage()
-
-# ============================================================ SLIDE 8 — METHODOLOGY
-page_bg(); header("Modelling approach: rigorous, reproducible, honest","METHODOLOGY",8)
+# ============================================================ METHODOLOGY
+page_bg(); header("Modelling approach: rigorous, reproducible, honest","METHODOLOGY")
 steps=[("01","Clean & engineer","Drop 9 high-missing + 4 protected fields; impute, encode; engineer 7 features "
         f"(usage trend, overage share, handset months...). {R['n_features_model']} model features."),
        ("02","Benchmark + ensemble","4 model families (LogReg, RF, XGBoost, LightGBM) plus soft-voting & "
@@ -274,7 +246,7 @@ footer("Source: held-out test set (25% of 100,000), Company A dataset.")
 c.showPage()
 
 # ============================================================ SLIDE 10 — TRUST: SHAP + CALIBRATION
-page_bg(); header("Why we trust the model: explainable & calibrated","MODEL EXPLAINABILITY & TRUST",10)
+page_bg(); header("Why we trust the model: explainable & calibrated","MODEL EXPLAINABILITY & TRUST")
 img(f"{FIG}/05_shap.png",70,150,540,430)
 img(f"{FIG}/06_calibration.png",640,170,330,400)
 sh=list(R["shap_top"].items())
@@ -289,7 +261,7 @@ footer("Source: SHAP values on held-out set; reliability curve (10 bins), isoton
 c.showPage()
 
 # ============================================================ SLIDE 11 — DIFFERENTIATOR (EVaR)
-page_bg(); header("Our differentiator: target value, not just probability","VALUE-BASED TARGETING  (EVaR)",11)
+page_bg(); header("Our differentiator: target value, not just probability","VALUE-BASED TARGETING  (EVaR)")
 img(f"{FIG}/07_evar.png",90,150,560,430)
 sc=R["targeting"]["by_score"]["0.2"]["rev_capture"]
 ev=R["targeting"]["by_evar"]["0.2"]["rev_capture"]
@@ -308,7 +280,7 @@ footer("Source: gains simulation on held-out test set; EVaR = calibrated P(churn
 c.showPage()
 
 # ============================================================ SLIDE 12 — PERSONAS
-page_bg(); header("Who to target: four data-derived retention personas","CUSTOMER SEGMENTATION  (K-MEANS)",12)
+page_bg(); header("Who to target: four data-derived retention personas","CUSTOMER SEGMENTATION  (K-MEANS)")
 img(f"{FIG}/10_personas.png",90,160,560,420)
 P=R["personas"]
 # label personas from real cluster stats
@@ -335,7 +307,7 @@ footer("Source: K-means (k=4) on standardised behavioural features of the custom
 c.showPage()
 
 # ============================================================ SLIDE 13 — TREATMENT DESIGN
-page_bg(); header("From segment to action: the treatment playbook","RETENTION OFFER DESIGN",13)
+page_bg(); header("From segment to action: the treatment playbook","RETENTION OFFER DESIGN")
 wrap(100,H-148,"Each persona maps to a specific offer with an explicit cost, an expected save-rate, and a "
      "margin guardrail - so spend is disciplined and never margin-negative.",13.5,SLATE,leading=18,maxw=1080)
 cols=[("Persona",250),("Problem",235),("Offer",235),("Cost",95),("Save rate",115),("Guardrail",150)]
@@ -365,7 +337,7 @@ footer("Offer costs are planning ranges to be calibrated in the pilot; save-rate
 c.showPage()
 
 # ============================================================ SLIDE 14 — BUSINESS CASE
-page_bg(); header("The business case: strong base/bull upside, bear flags the floor","QUANTIFIED IMPACT  (per 1M subscribers / yr)",14)
+page_bg(); header("The business case: strong base/bull upside, bear flags the floor","QUANTIFIED IMPACT  (per 1M subscribers / yr)")
 img(f"{FIG}/08_profit_curve.png",70,150,560,420)
 img(f"{FIG}/09_scenarios.png",650,150,560,420)
 chip(70,86,"Net benefit / yr", money(base["net_benefit"]), GREEN, w=250, h=84)
@@ -377,7 +349,27 @@ footer(f"Base case: 22% annual churn, 50% margin, 30% save-rate, ${base['offer']
 c.showPage()
 
 # ============================================================ SLIDE 14 — QUOTATION (THE ASK)
-page_bg(); header("Our proposal & quotation","THE ASK",16)
+page_bg(); header("Roadmap: from churn prediction to causal uplift","MODEL MATURITY")
+wrap(100,H-148,"Today we target who is most valuable AND likely to churn. The next frontier is targeting only the "
+     "persuadable - customers whose behaviour the offer actually changes - using uplift (causal) modelling.",13.5,SLATE,leading=18,maxw=1080)
+stages=[("Now · Risk x Value","EVaR targeting on calibrated churn probability x customer value. Live in month 1.",GREEN,"LIVE"),
+        ("Next · Uplift modelling","Two-model / meta-learner on pilot A/B data to estimate per-customer treatment effect - stop spending on 'sure things' and 'lost causes'.",ORANGE,"Q2"),
+        ("Then · Offer optimisation","Match each persuadable customer to the cheapest offer that retains them; multi-armed bandits to learn online.",BLUE,"Q3"),
+        ("Future · Real-time triggers","Stream events (dropped calls, bill spikes, usage cliffs) into live scoring for in-the-moment intervention.",TEAL,"Q4")]
+yy=H-228
+for h,b,col,tag in stages:
+    rect(100,yy-66,1080,78,WHITE,r=12); rect(100,yy-66,6,78,col)
+    text(126,yy-26,h,14.5,INK,"Helvetica-Bold")
+    wrap(126,yy-48,b,11.5,SLATE,leading=15,maxw=830)
+    rect(1040,yy-44,110,34,col,r=8); text(1095,yy-32,tag,12,WHITE,"Helvetica-Bold",align="center")
+    yy-=96
+wrap(100,96,"Why it matters: uplift modelling typically cuts wasted retention spend materially by ignoring customers "
+     "who would have stayed anyway - turning a good ROI into a great one.",11.5,MUTE,leading=15,maxw=1080)
+footer("Uplift modelling requires experimental (A/B) data - which is exactly what the pilot produces.")
+c.showPage()
+
+# ============================================================ SLIDE 16 — QUOTATION
+page_bg(); header("Our proposal & quotation","THE ASK")
 wrap(100,H-148,"We propose a 12-week build of the retention engine, then an ongoing managed service. "
      "Our fee is a small fraction of the value we protect.",14,SLATE,leading=20,maxw=1040)
 ph=[("Phase 1 · Build (wk 1-6)","Data pipeline, model, calibration, EVaR scoring, persona logic",BLUE),
@@ -405,7 +397,7 @@ footer("Fee illustrative for a PoC engagement; scales with subscriber base. Valu
 c.showPage()
 
 # ============================================================ SLIDE 15 — RISKS, FAIRNESS & REFERENCES
-page_bg(); header("Risks, fairness & references","GOVERNANCE & SOURCES",17)
+page_bg(); header("Risks, fairness & references","GOVERNANCE & SOURCES")
 img(f"{FIG}/11_fairness.png",90,250,470,300)
 f=R["fairness"]
 improve=f["auc_without_protected"]-f["auc_with_protected"]
