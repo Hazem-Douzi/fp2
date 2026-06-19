@@ -48,8 +48,9 @@ fig,ax=plt.subplots(figsize=(7.5,4.4))
 xs=list(eb.keys()); ys=[eb[k] for k in xs]
 ax.plot(xs,ys,marker="o",color=ORANGE,lw=3,ms=9)
 ax.yaxis.set_major_formatter(PercentFormatter(1.0))
-for x,y in zip(xs,ys): ax.text(x,y+.008,f"{y*100:.0f}%",ha="center",fontweight="bold",color=NAVY)
-ax.set_title("Churn rises monotonically with handset age (eqpdays)",fontweight="bold",color=NAVY)
+for x,y in zip(xs,ys): ax.text(x,y+.012,f"{y*100:.0f}%",ha="center",fontweight="bold",color=NAVY)
+ax.set_ylim(min(ys)-0.04, max(ys)+0.06)
+ax.set_title("Churn jumps once a handset passes ~12 months",fontweight="bold",color=NAVY,pad=12)
 ax.set_xlabel("Days on current handset (quintiles)"); ax.set_ylabel("Churn rate")
 save(fig,"03_eqpdays.png")
 
