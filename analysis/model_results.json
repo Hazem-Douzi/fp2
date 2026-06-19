@@ -1,0 +1,158 @@
+{
+  "results": {
+    "LogisticRegression": {
+      "auc": 0.6313,
+      "accuracy": 0.5953,
+      "precision": 0.5918,
+      "recall": 0.5912,
+      "f1": 0.5915
+    },
+    "RandomForest": {
+      "auc": 0.6712,
+      "accuracy": 0.6199,
+      "precision": 0.6115,
+      "recall": 0.6389,
+      "f1": 0.6249
+    },
+    "XGBoost": {
+      "auc": 0.6951,
+      "accuracy": 0.6383,
+      "precision": 0.6323,
+      "recall": 0.6459,
+      "f1": 0.639
+    }
+  },
+  "best_model": "XGBoost",
+  "top_features": [
+    {
+      "feature": "eqpdays",
+      "importance": 0.0208
+    },
+    {
+      "feature": "refurb_new_N",
+      "importance": 0.0182
+    },
+    {
+      "feature": "months",
+      "importance": 0.017
+    },
+    {
+      "feature": "hnd_webcap_WCMB",
+      "importance": 0.0144
+    },
+    {
+      "feature": "ethnic_Z",
+      "importance": 0.0111
+    },
+    {
+      "feature": "refurb_new_R",
+      "importance": 0.0108
+    },
+    {
+      "feature": "hnd_price",
+      "importance": 0.0107
+    },
+    {
+      "feature": "asl_flag_N",
+      "importance": 0.0105
+    },
+    {
+      "feature": "mou_Mean",
+      "importance": 0.0104
+    },
+    {
+      "feature": "crclscod_EA",
+      "importance": 0.0094
+    },
+    {
+      "feature": "ethnic_O",
+      "importance": 0.0093
+    },
+    {
+      "feature": "HHstatin_nan",
+      "importance": 0.0089
+    },
+    {
+      "feature": "uniqsubs",
+      "importance": 0.0089
+    },
+    {
+      "feature": "infobase_nan",
+      "importance": 0.0083
+    },
+    {
+      "feature": "marital_U",
+      "importance": 0.0083
+    }
+  ],
+  "lift": [
+    {
+      "decile": 1,
+      "churn_rate": 0.7856,
+      "lift": 1.5850213864901943
+    },
+    {
+      "decile": 2,
+      "churn_rate": 0.6704,
+      "lift": 1.3525946251311436
+    },
+    {
+      "decile": 3,
+      "churn_rate": 0.6364,
+      "lift": 1.2839964490355902
+    },
+    {
+      "decile": 4,
+      "churn_rate": 0.5564,
+      "lift": 1.1225889758695826
+    },
+    {
+      "decile": 5,
+      "churn_rate": 0.5228,
+      "lift": 1.0547978371398596
+    },
+    {
+      "decile": 6,
+      "churn_rate": 0.4752,
+      "lift": 0.9587603906060851
+    },
+    {
+      "decile": 7,
+      "churn_rate": 0.4384,
+      "lift": 0.8845129529497215
+    },
+    {
+      "decile": 8,
+      "churn_rate": 0.37,
+      "lift": 0.7465095633927851
+    },
+    {
+      "decile": 9,
+      "churn_rate": 0.3068,
+      "lift": 0.6189976595916391
+    },
+    {
+      "decile": 10,
+      "churn_rate": 0.1944,
+      "lift": 0.3922201597933984
+    }
+  ],
+  "top_decile_lift": 1.585,
+  "top30_capture": 0.422,
+  "base_churn": 0.4956,
+  "eqpdays_churn": {
+    "0-150": 0.4148,
+    "150-300": 0.3821,
+    "300-450": 0.5787,
+    "450-600": 0.5328,
+    "600+": 0.563
+  },
+  "tenure_churn": {
+    "6-12": 0.3838,
+    "12": 0.4713,
+    "12-18": 0.5272,
+    "18-24": 0.5056,
+    "24-36": 0.4999,
+    "36+": 0.4729
+  }
+}
