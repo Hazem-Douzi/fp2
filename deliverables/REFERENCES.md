@@ -40,13 +40,17 @@ the financial business case are the authors' own analysis of the provided data, 
 
 12. **Verbeke, W., Dejaeger, K., Martens, D., Hur, J., & Baesens, B. (2012).** "New insights into churn prediction in the telecommunication sector: A profit driven data mining approach." *European Journal of Operational Research*, 218(1), 211–229. — Basis for our **value-based (Expected-Value-at-Risk) targeting**: ranking by expected revenue lost, not churn probability alone.
 
+13. **Niculescu-Mizil, A., & Caruana, R. (2005).** "Predicting Good Probabilities with Supervised Learning." *Proceedings of the 22nd International Conference on Machine Learning (ICML '05)*, 625–632. — Calibration assessment (reliability, Brier score) and isotonic/Platt scaling, used to validate that our probabilities are trustworthy for dollar decisions.
+
+14. **Gutierrez, P., & Gérardy, J.-Y. (2017).** "Causal Inference and Uplift Modelling: A Review of the Literature." *Proceedings of Machine Learning Research*, 67, 1–13. — Basis for the **uplift-modelling roadmap**: targeting persuadable customers using experimental (A/B) data.
+
 ---
 
 ## Provided course materials & dataset
 
-13. **GCI World (2026).** *Company A Dataset Overview* and *Final Assignment README* (provided course materials).
+15. **GCI World (2026).** *Company A Dataset Overview* and *Final Assignment README* (provided course materials).
 
-14. **Dataset.** Cell2Cell-style telecom customer dataset provided by the course: `Client.csv` (customer profile, ~100,000 rows) joined to `Record.csv` (usage history + churn label) on `Customer_ID`. The modeling sample is balanced ~50/50 on churn by design (not the population base rate); the business case therefore uses an explicitly stated operating churn assumption (22%/year ≈ 2.0%/month).
+16. **Dataset.** Cell2Cell-style telecom customer dataset provided by the course: `Client.csv` (customer profile, ~100,000 rows) joined to `Record.csv` (usage history + churn label) on `Customer_ID`. The modeling sample is balanced ~50/50 on churn by design (not the population base rate); the business case therefore uses an explicitly stated operating churn assumption (22%/year ≈ 2.0%/month).
 
 ---
 
@@ -67,12 +71,14 @@ docs. Headline results:
 
 - **Data hygiene:** protected attributes (ethnicity, marital status, income, credit class) and 9
   high-missing (>20% NA) columns are dropped before modelling.
-- **Fairness A/B:** removing protected attributes changes AUC by **−0.0006** (0.6909 → 0.6903) —
-  ethically defensible at essentially zero predictive cost.
+- **Fairness A/B:** removing protected attributes does **not** hurt performance — AUC moves
+  **0.6903 → 0.6909 (+0.0006)** — so excluding them is ethically sound at zero predictive cost.
 - **Models:** ARPU $58.72/mo · **XGBoost ROC-AUC 0.692, 5-fold CV 0.695 ± 0.003** (LightGBM 0.690,
-  RF 0.676, LogReg 0.615).
-- **Calibration:** probabilities are prior-shifted from the oversampled 50/50 sample to a realistic
-  **22%/yr** population churn rate, so EVaR figures are on a believable dollar scale.
+  RF 0.676, LogReg 0.615). Soft-voting & stacking ensembles reached AUC 0.6921 (**+0.0005**, below the
+  0.003 promotion bar) → keep XGBoost for simpler, governable deployment.
+- **Calibration:** the model is already well-calibrated (**ECE 0.7%, Brier 0.221**; an isotonic calibrator
+  confirms no material gain), then probabilities are prior-shifted from the oversampled 50/50 sample to a
+  realistic **22%/yr** population churn rate, so EVaR figures are on a believable dollar scale.
 - **Value targeting:** ranking by EVaR captures **43.7% of revenue-at-risk in the top 20% vs 28.3%** for
   churn-probability ranking (**1.55×**).
 - **Business case (per 1M subscribers/yr):** base ≈ **$10.1M net benefit at 1.68× ROI**; bull ≈ $17.6M

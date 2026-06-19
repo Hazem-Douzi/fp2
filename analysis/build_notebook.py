@@ -213,6 +213,34 @@ def prior_shift(p,pi,p_sample=0.5):
 p_pop=prior_shift(np.clip(p_best,1e-6,1-1e-6),PI)
 print(f"Mean P(churn) after prior-shift to {PI:.0%}: {p_pop.mean():.3f}")""")
 
+md("""## 6b. Ensemble experiment — judged on revenue capture, not just AUC
+We test **soft-voting** and **stacking** ensembles. The decision rule is deliberate: we only promote an
+ensemble if it beats the best single model by **≥ 0.003 AUC**. Otherwise we keep the simpler, more
+governable single model — and we evaluate on **revenue-at-risk capture**, the metric that actually drives ROI.""")
+code("""rev_med0=df["rev_Mean"].median()
+arev=(df.loc[yte.index,"rev_Mean"].fillna(rev_med0).clip(lower=0).values*12)
+rar_tot=arev[yte.values==1].sum()
+def ps(p,pi=0.22,p0=0.5):
+    o=(np.clip(p,1e-6,1-1e-6)/(1-np.clip(p,1e-6,1-1e-6)))*(pi/(1-pi))/(p0/(1-p0)); return o/(1+o)
+def rev20(p):
+    idx=np.argsort(-(ps(p)*arev))[:int(len(p)*0.20)]
+    return arev[idx][yte.values[idx]==1].sum()/rar_tot
+ens={n:{"AUC":round(roc_auc_score(yte,proba[n]),4),"rev@20%":round(rev20(proba[n]),4)}
+     for n in ["XGBoost","LightGBM","Random Forest"]}
+p_soft=0.5*proba["XGBoost"]+0.4*proba["LightGBM"]+0.1*proba["Random Forest"]
+ens["Soft Voting"]={"AUC":round(roc_auc_score(yte,p_soft),4),"rev@20%":round(rev20(p_soft),4)}
+stack=StackingClassifier(estimators=[("xgb",models["XGBoost"]),("lgb",models["LightGBM"]),
+        ("rf",models["Random Forest"])],final_estimator=LogisticRegression(max_iter=2000),
+        stack_method="predict_proba",cv=3,n_jobs=-1).fit(Xtr,ytr)
+p_stack=stack.predict_proba(Xte)[:,1]
+ens["Stacking"]={"AUC":round(roc_auc_score(yte,p_stack),4),"rev@20%":round(rev20(p_stack),4)}
+ens_df=pd.DataFrame(ens).T
+best_single=max(v["AUC"] for k,v in ens.items() if k in ["XGBoost","LightGBM","Random Forest"])
+gain=max(ens["Soft Voting"]["AUC"],ens["Stacking"]["AUC"])-best_single
+print(ens_df)
+print(f"\\nBest ensemble gain over best single model: {gain:+.4f} AUC")
+print("Decision:", "PROMOTE ensemble" if gain>=0.003 else f"KEEP single model ({best}) — gain below 0.003 bar, not worth the added complexity")""")
+
 md("""## 7. Value-based targeting — Expected Value-at-Risk (EVaR)
 A \\$130/mo customer is not worth the same as a \\$25/mo one. We rank by **EVaR = P(churn) × annual
 revenue** and compare how much *revenue-at-risk* each strategy captures for the **same contact budget**.""")
@@ -300,9 +328,12 @@ print(f"Company A keeps ~${net_base-annual_fee:,.0f} / yr per 1M subscribers")""
 
 md("""## 12. Conclusion
 - **Churn is predictable and concentrated**, and its strongest *controllable* driver is **handset age**.
-- **XGBoost** is the best ranker (CV-validated, calibrated); removing protected attributes costs ~0 AUC.
-- Ranking by **EVaR** protects **~1.6×** the revenue of churn-only targeting for the same budget.
-- A monthly, persona-driven retention engine is **ROI-positive across bear, base, and bull** scenarios.
+- **XGBoost** is the best ranker (CV-validated, well-calibrated — ECE < 1%); removing protected attributes
+  costs ~0 AUC, and tested ensembles did not clear the 0.003 promotion bar.
+- The model is **moderately predictive (AUC ≈ 0.69)** — the value comes from **value-weighted (EVaR)
+  targeting**, which protects **~1.6×** the revenue of churn-only targeting for the same budget.
+- The retention engine has **strong base/bull upside ($10M+/1M subs)**, but the **bear case is negative** —
+  so we **de-risk by gating scale-up on a paid A/B pilot** rather than over-promising guaranteed returns.
 
 **Reproducibility:** fixed `SEED=42`. Set `TELECOM_DATA_DIR` to the folder holding `Client.csv` and
 `Record.csv`, then *Run All*. This notebook shares identical logic with `analysis/pipeline.py`.
