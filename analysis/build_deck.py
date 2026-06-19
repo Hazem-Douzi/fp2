@@ -326,7 +326,7 @@ footer("Source: K-means (k=4) on standardised behavioural features of the custom
 c.showPage()
 
 # ============================================================ SLIDE 13 — BUSINESS CASE
-page_bg(); header("The business case: ROI-positive across scenarios","QUANTIFIED IMPACT  (per 1M subscribers / yr)",13)
+page_bg(); header("The business case: strong base/bull upside, bear flags the floor","QUANTIFIED IMPACT  (per 1M subscribers / yr)",13)
 img(f"{FIG}/08_profit_curve.png",70,150,560,420)
 img(f"{FIG}/09_scenarios.png",650,150,560,420)
 chip(70,86,"Net benefit / yr", money(base["net_benefit"]), GREEN, w=250, h=84)
@@ -367,9 +367,9 @@ c.showPage()
 
 # ============================================================ SLIDE 15 — RISKS, FAIRNESS & REFERENCES
 page_bg(); header("Risks, fairness & references","GOVERNANCE & SOURCES",15)
-img(f"{FIG}/11_fairness.png",90,150,470,360)
+img(f"{FIG}/11_fairness.png",90,250,470,300)
 f=R["fairness"]
-text(100,H-528,f"Fairness test: removing protected attributes changes AUC by {f['auc_delta']:+.4f}.",11.5,NAVY,"Helvetica-Bold")
+text(325,232,f"Removing protected attributes changes AUC by {f['auc_delta']:+.4f}",10.5,NAVY,"Helvetica-Bold",align="center")
 y=H-150
 y=bullet(600,y,"Fairness by design",f"We exclude ethnicity, marital status, income & credit class. The cost is "
        f"{abs(f['auc_delta'])*100:.2f} AUC points (essentially zero) - so we lose nothing by being fair.",color=BLUE,maxw=560)
@@ -380,15 +380,15 @@ y=bullet(600,y-10,"Monitor for drift","Re-train on fresh data and watch feature 
 y=bullet(600,y-10,"Don't over-discount","Profit-curve guardrails and holdouts prevent giving margin away to "
        "customers who would have stayed anyway.",color=GREEN,maxw=560)
 # references
-rect(600,96,580,150,WHITE,r=12); rect(600,96,580,34,NAVY,r=12)
-text(620,H-602,"Selected references",12.5,WHITE,"Helvetica-Bold")
+rect(600,86,580,160,WHITE,r=12); rect(600,212,580,34,NAVY,r=12)
+text(620,222,"Selected references",12.5,WHITE,"Helvetica-Bold")
 refs=["Reichheld & Sasser, 'Zero Defections', HBR.  ·  Bain & Company retention research.",
       "Verizon / T-Mobile investor reports 2024-25.  ·  CTIA Wireless Survey 2025.",
       "Verbeke et al. (2012), profit-driven churn, EJOR.  ·  Lundberg & Lee (2017), SHAP, NeurIPS.",
       "scikit-learn; XGBoost; LightGBM documentation."]
-yy=170
+yy=186
 for r in refs:
-    text(620,yy,"-",10,ORANGE); wrap(634,yy,r,9.6,SLATE,leading=12,maxw=540); yy-=24
+    text(620,yy,"-",10,ORANGE); wrap(634,yy,r,9.6,SLATE,leading=12,maxw=540); yy-=26
 rect(100,96,470,80,HexColor("#fff7ed"),r=10); rect(100,96,6,80,ORANGE)
 wrap(124,150,"AI-use disclosure: generative AI assisted with code scaffolding, drafting and visualisation. "
      "All analysis, numbers and conclusions were computed from the dataset and verified by the author. "
