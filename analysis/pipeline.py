@@ -18,16 +18,25 @@ Outputs: analysis/results.json  (single source of truth for deck + notebook)
 """
 import os, json, warnings, numpy as np, pandas as pd
 warnings.filterwarnings("ignore")
-from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+from sklearn.model_selection import (train_test_split, StratifiedKFold, cross_val_score,
+                                     RandomizedSearchCV)
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, StackingClassifier
 from sklearn.preprocessing import StandardScaler
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
 from sklearn.cluster import KMeans
-from sklearn.metrics import (roc_auc_score, accuracy_score, precision_score, recall_score,
-                             f1_score, brier_score_loss)
+from sklearn.metrics import (roc_auc_score, average_precision_score, precision_recall_curve,
+                             accuracy_score, precision_score, recall_score, f1_score,
+                             brier_score_loss)
 from sklearn.calibration import calibration_curve, CalibratedClassifierCV
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
+try:
+    from catboost import CatBoostClassifier
+    HAS_CATBOOST = True
+except Exception:
+    HAS_CATBOOST = False
 
 SEED = 42
 np.random.seed(SEED)
@@ -92,25 +101,34 @@ R["protected_dropped"] = PROTECTED
 R["high_missing_dropped"] = sorted(HIGH_MISSING)
 R["engineered_features"] = ENGINEERED
 
-def build_matrix(frame, include_protected):
+def build_matrix(frame, include_protected, cols=None):
+    """Return a NaN-preserving numeric matrix (drop + one-hot only).
+    Imputation is done AFTER the split with train-only statistics to avoid leakage."""
     drop = set(DROP_ID + HIGH_MISSING)
     if not include_protected:
         drop |= set(PROTECTED)
     X = frame.drop(columns=[c for c in drop if c in frame.columns] + ["churn"], errors="ignore")
-    # one-hot encode remaining low-cardinality categoricals
     cat = [c for c in X.columns if X[c].dtype == "object"]
     cat = [c for c in cat if X[c].nunique() <= 20]
     X = X.drop(columns=[c for c in X.columns if X[c].dtype == "object" and c not in cat], errors="ignore")
     X = pd.get_dummies(X, columns=cat, dummy_na=True)
-    X = X.apply(pd.to_numeric, errors="coerce").fillna(X.median(numeric_only=True)).fillna(0)
+    X = X.apply(pd.to_numeric, errors="coerce")          # keep NaNs
+    if cols is not None:                                  # align columns across subsets
+        X = X.reindex(columns=cols, fill_value=0)
     return X
+
+def impute_train_test(Xtr, Xte):
+    """Median-impute using TRAIN statistics only (leakage-safe)."""
+    med = Xtr.median(numeric_only=True)
+    return Xtr.fillna(med).fillna(0), Xte.fillna(med).fillna(0)
 
 y = df["churn"].astype(int)
 
-# ----------------------------------------------------------------- fairness A/B
+# ----------------------------------------------------------------- fairness A/B (leakage-safe)
 def auc_for(include_protected):
     X = build_matrix(df, include_protected)
     Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.25, random_state=SEED, stratify=y)
+    Xtr, Xte = impute_train_test(Xtr, Xte)
     m = XGBClassifier(n_estimators=400, max_depth=5, learning_rate=0.05,
                       subsample=0.9, colsample_bytree=0.9, eval_metric="logloss",
                       random_state=SEED, n_jobs=-1)
@@ -124,9 +142,11 @@ R["fairness"] = {"auc_with_protected": round(auc_with, 4),
                  "auc_delta": round(auc_with - auc_without, 4)}
 
 # ----------------------------------------------------------------- main models (protected REMOVED)
-X = build_matrix(df, include_protected=False)
-R["n_features_model"] = int(X.shape[1])
-Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.25, random_state=SEED, stratify=y)
+Xfull = build_matrix(df, include_protected=False)
+R["n_features_model"] = int(Xfull.shape[1])
+Xtr_raw, Xte_raw, ytr, yte = train_test_split(Xfull, y, test_size=0.25, random_state=SEED, stratify=y)
+Xtr, Xte = impute_train_test(Xtr_raw, Xte_raw)
+X = Xfull   # kept for SHAP column reference
 
 models = {
     "Logistic Regression": LogisticRegression(max_iter=2000, C=0.5),
@@ -139,10 +159,16 @@ models = {
                                learning_rate=0.03, subsample=0.9, colsample_bytree=0.9,
                                random_state=SEED, n_jobs=-1, verbose=-1),
 }
+if HAS_CATBOOST:
+    models["CatBoost"] = CatBoostClassifier(iterations=600, depth=6, learning_rate=0.03,
+                                            random_seed=SEED, verbose=0, allow_writing_files=False)
+R["has_catboost"] = HAS_CATBOOST
 # Logistic needs scaling
 scaler = StandardScaler().fit(Xtr)
 Xtr_s, Xte_s = scaler.transform(Xtr), scaler.transform(Xte)
 
+base_rate = float(yte.mean())   # PR-AUC baseline (positive prevalence on test)
+R["test_positive_rate"] = round(base_rate, 4)
 res = {}
 proba = {}
 for name, m in models.items():
@@ -152,6 +178,7 @@ for name, m in models.items():
         m.fit(Xtr, ytr); p = m.predict_proba(Xte)[:, 1]
     pred = (p >= 0.5).astype(int)
     res[name] = {"auc": round(roc_auc_score(yte, p), 4),
+                 "pr_auc": round(average_precision_score(yte, p), 4),
                  "acc": round(accuracy_score(yte, pred), 4),
                  "prec": round(precision_score(yte, pred), 4),
                  "rec": round(recall_score(yte, pred), 4),
@@ -160,6 +187,7 @@ for name, m in models.items():
 R["models"] = res
 best_name = max(res, key=lambda k: res[k]["auc"])
 R["best_model"] = best_name
+R["best_pr_auc"] = res[best_name]["pr_auc"]
 
 # 5-fold CV for the winner
 best = models[best_name]
@@ -168,7 +196,71 @@ Xcv = Xtr_s if best_name == "Logistic Regression" else Xtr
 cv = cross_val_score(best, Xcv, ytr, cv=skf, scoring="roc_auc", n_jobs=-1)
 R["cv_auc_mean"], R["cv_auc_std"] = round(cv.mean(), 4), round(cv.std(), 4)
 
+# ----------------------------------------------------------------- leakage-safe XGBoost tuning
+# Tune INSIDE 3-fold CV with imputation in-pipeline, so no fold sees other folds' statistics.
+skf3 = StratifiedKFold(3, shuffle=True, random_state=SEED)
+tune_pipe = Pipeline([("imp", SimpleImputer(strategy="median")),
+                      ("clf", XGBClassifier(eval_metric="logloss", random_state=SEED, n_jobs=-1))])
+default_xgb_cv = cross_val_score(
+    Pipeline([("imp", SimpleImputer(strategy="median")),
+              ("clf", XGBClassifier(n_estimators=500, max_depth=5, learning_rate=0.04,
+                                    subsample=0.9, colsample_bytree=0.9, eval_metric="logloss",
+                                    random_state=SEED, n_jobs=-1))]),
+    Xtr_raw, ytr, cv=skf3, scoring="roc_auc", n_jobs=-1).mean()
+param_dist = {"clf__n_estimators": [300, 500, 700],
+              "clf__max_depth": [3, 4, 5, 6],
+              "clf__learning_rate": [0.02, 0.03, 0.05, 0.08],
+              "clf__subsample": [0.7, 0.8, 0.9],
+              "clf__colsample_bytree": [0.7, 0.8, 0.9],
+              "clf__min_child_weight": [1, 5, 10],
+              "clf__reg_lambda": [1.0, 3.0, 5.0]}
+search = RandomizedSearchCV(tune_pipe, param_dist, n_iter=12, scoring="roc_auc",
+                            cv=skf3, random_state=SEED, n_jobs=-1, refit=True)
+search.fit(Xtr_raw, ytr)
+p_tuned = search.predict_proba(Xte_raw)[:, 1]
+R["tuning"] = {"cv_auc_default": round(float(default_xgb_cv), 4),
+               "cv_auc_tuned": round(float(search.best_score_), 4),
+               "test_auc_tuned": round(roc_auc_score(yte, p_tuned), 4),
+               "test_pr_auc_tuned": round(average_precision_score(yte, p_tuned), 4),
+               "best_params": {k.replace("clf__", ""): v for k, v in search.best_params_.items()}}
+
+# ----------------------------------------------------------------- feature-group ablation
+def classify_col(c):
+    base = c.split("_")[0]
+    eng = {"usage", "revenue", "overage", "dropblk", "care", "rev"}   # engineered ratios (rev_per_sub)
+    if c in ("usage_trend","revenue_trend","overage_share","dropblk_rate","care_per_mou","rev_per_sub",
+             "change_mou","change_rev"): return "engineered"
+    qual = ("drop_","blck_","unan_","custcare","ccrndmou","cc_mou","attempt","complete")
+    if any(c.startswith(q) for q in qual): return "quality"
+    usage = ("mou","rev","qty","totmrc","ovr","roam","peak","opk","da_Mean","plcd","recv","comp",
+             "inonemin","threeway","callfwd","callwait","owylis","iwylis","mouowylisv","mouiwylisv",
+             "totcalls","totmou","totrev","adjrev","adjmou","adjqty","avgrev","avgmou","avgqty",
+             "avg3","avg6")
+    if any(c.startswith(u) for u in usage): return "usage"
+    return "profile"
+groups = {}
+for c in Xfull.columns:
+    groups.setdefault(classify_col(c), []).append(c)
+ablation_order = ["profile", "usage", "quality", "engineered"]
+cum, abl = [], []
+for g in ablation_order:
+    cum += groups.get(g, [])
+    cols = [c for c in cum if c in Xtr.columns]
+    m = XGBClassifier(n_estimators=400, max_depth=5, learning_rate=0.04, subsample=0.9,
+                      colsample_bytree=0.9, eval_metric="logloss", random_state=SEED, n_jobs=-1)
+    m.fit(Xtr[cols], ytr)
+    pp = m.predict_proba(Xte[cols])[:, 1]
+    abl.append({"step": f"+{g}", "n_features": len(cols),
+                "auc": round(roc_auc_score(yte, pp), 4),
+                "pr_auc": round(average_precision_score(yte, pp), 4)})
+R["ablation"] = abl
+
 p_best = proba[best_name]
+# PR curve for the winner (thinned for plotting)
+prec_c, rec_c, _ = precision_recall_curve(yte, p_best)
+step = max(1, len(prec_c) // 200)
+R["pr_curve"] = {"precision": [round(float(x), 4) for x in prec_c[::step]],
+                 "recall": [round(float(x), 4) for x in rec_c[::step]]}
 
 # ----------------------------------------------------------------- REAL calibration (isotonic) + Brier + ECE
 def expected_calibration_error(y_true, p, n_bins=10):
@@ -211,13 +303,18 @@ p_pop = prior_shift(np.clip(p_best, 1e-6, 1 - 1e-6), PI)
 R["assumed_population_churn_annual"] = PI
 R["pop_prob_mean"] = round(float(p_pop.mean()), 4)
 
-# ----------------------------------------------------------------- targeting (rank by EVaR vs score vs random)
+# ----------------------------------------------------------------- targeting vs FIVE baselines
+# Defend the model against naive strategies: random, rule-based (handset age),
+# revenue-only (ignore churn), churn-probability only, and value-weighted EVaR.
 rev_med = df["rev_Mean"].median()
 annual_rev = (df.loc[yte.index, "rev_Mean"].fillna(rev_med).clip(lower=0).values * 12)
+eqp_te = df.loc[yte.index, "eqpdays"].fillna(df["eqpdays"].median()).values
 evar = p_pop * annual_rev
-order = {"by_evar": np.argsort(-evar),
-         "by_score": np.argsort(-p_best),
-         "by_random": np.random.RandomState(SEED).permutation(len(p_best))}
+order = {"by_evar":    np.argsort(-evar),                 # our approach: P(churn) x value
+         "by_score":   np.argsort(-p_best),               # churn-probability only
+         "by_revenue": np.argsort(-annual_rev),           # revenue-only (ignore churn)
+         "by_rule":    np.argsort(-eqp_te),               # rule-based: oldest handset first
+         "by_random":  np.random.RandomState(SEED).permutation(len(p_best))}
 yte_arr = yte.values
 tot_churn = yte_arr.sum()
 tot_rev_risk = annual_rev[yte_arr == 1].sum()
@@ -228,6 +325,8 @@ def capture(idx, frac):
 R["targeting"] = {}
 for key, idx in order.items():
     R["targeting"][key] = {str(f): capture(idx, f) for f in (0.1, 0.2, 0.3)}
+# headline: revenue capture @20% for each baseline (for the deck chart)
+R["baseline_rev20"] = {k: R["targeting"][k]["0.2"]["rev_capture"] for k in order}
 
 # ----------------------------------------------------------------- ensemble experiment
 # Judge ensembles on BOTH AUC and revenue capture@20% (business value), not AUC alone.
@@ -356,9 +455,13 @@ print("=== SUMMARY ===")
 print("rows", R["n_rows"], "| model features", R["n_features_model"])
 print("FAIRNESS auc with/without protected:", R["fairness"])
 for k, v in res.items(): print(" ", k, v["auc"])
-print("best", best_name, "CV", R["cv_auc_mean"], "+/-", R["cv_auc_std"])
+print("best", best_name, "CV", R["cv_auc_mean"], "+/-", R["cv_auc_std"], "| PR-AUC", R["best_pr_auc"], "(base", R["test_positive_rate"], ")")
+print("MODELS", {k: (v["auc"], v["pr_auc"]) for k, v in R["models"].items()})
+print("TUNING", R["tuning"]["cv_auc_default"], "->", R["tuning"]["cv_auc_tuned"], "(test", R["tuning"]["test_auc_tuned"], ")")
+print("ABLATION", [(a["step"], a["auc"]) for a in R["ablation"]])
 print("CALIBRATION", R["calibration_metrics"])
 print("ENSEMBLE", {k: v for k, v in R["ensemble"].items()}, "| gain", R["ensemble_auc_gain"], "->", R["ensemble_decision"])
+print("BASELINES rev@20%", R["baseline_rev20"])
 print("EVaR rev capture@20%", evar_rev20, "vs score", score_rev20, "=", R["business"]["evar_vs_score_x"], "x")
 print("optimal contact frac", R["optimal_contact_frac"], "net@opt", R["optimal_net_1M"])
 print("BASE net", R["business"]["base"]["net_benefit"], "ROI", R["business"]["base"]["roi"])

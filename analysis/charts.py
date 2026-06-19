@@ -82,17 +82,20 @@ ax.text(0.04,0.92,f"ECE {cm['ece_raw']*100:.1f}%  |  Brier {cm['brier_raw']:.3f}
         transform=ax.transAxes,fontsize=10.5,color=NAVY,fontweight="bold")
 ax.legend(loc="lower right"); save(fig,"06_calibration.png")
 
-# ---- 7. EVaR vs score vs random (rev-at-risk captured @20%) ----
-ev=R["targeting"]["by_evar"]["0.2"]["rev_capture"]
-sc=R["targeting"]["by_score"]["0.2"]["rev_capture"]
-rd=R["targeting"]["by_random"]["0.2"]["rev_capture"]
-fig,ax=plt.subplots(figsize=(7.5,4.6))
-bars=ax.bar(["Random\noutreach","Churn-score\nranking","EVaR\n(value-weighted)"],[rd,sc,ev],
-       color=[GRAY,TEAL,ORANGE],width=.6)
+# ---- 7. EVaR vs FOUR baselines (rev-at-risk captured @20%) ----
+bl=R["baseline_rev20"]
+spec=[("Random\noutreach","by_random",GRAY),
+      ("Rule: oldest\nhandset","by_rule",GRAY),
+      ("Revenue-only\nranking","by_revenue",GRAY),
+      ("Churn-score\nranking","by_score",TEAL),
+      ("EVaR\n(value-weighted)","by_evar",ORANGE)]
+names=[s[0] for s in spec]; vals=[bl[s[1]] for s in spec]; cols=[s[2] for s in spec]
+fig,ax=plt.subplots(figsize=(9,4.7))
+bars=ax.bar(names,vals,color=cols,width=.64)
 ax.yaxis.set_major_formatter(PercentFormatter(1.0))
-for b,v in zip(bars,[rd,sc,ev]): ax.text(b.get_x()+b.get_width()/2,v+.01,f"{v*100:.0f}%",ha="center",fontweight="bold",color=NAVY)
+for b,v in zip(bars,vals): ax.text(b.get_x()+b.get_width()/2,v+.008,f"{v*100:.0f}%",ha="center",fontweight="bold",color=NAVY)
 ax.set_title("Revenue-at-risk captured in the SAME top-20% contacted",fontweight="bold",color=NAVY)
-ax.set_ylim(0,.55); save(fig,"07_evar.png")
+ax.set_ylim(0,max(vals)+.08); save(fig,"07_evar.png")
 
 # ---- 8. profit curve (population-scaled, per 1M) ----
 pc=R["profit_curve"]; fr=[p["frac"] for p in pc]; net=[p["net"]/1e6 for p in pc]
@@ -163,5 +166,28 @@ for xi,a in zip(x,aucs): ax.text(xi-w/2,a+.0008,f"{a:.4f}",ha="center",fontsize=
 ax.set_title(f"Ensembles tested: +{R['ensemble_auc_gain']:.4f} AUC -> keep XGBoost (simpler to govern)",
              fontweight="bold",color=NAVY,fontsize=12)
 save(fig,"12_ensemble.png")
+
+# ---- 13. Precision-Recall curve (honest view on imbalance) ----
+pr=R["pr_curve"]; base=R["test_positive_rate"]; prauc=R["best_pr_auc"]
+fig,ax=plt.subplots(figsize=(7,5))
+ax.plot(pr["recall"],pr["precision"],color=ORANGE,lw=2.6,label=f"{R['best_model']} (PR-AUC {prauc:.3f})")
+ax.axhline(base,color=GRAY,ls="--",lw=1.4,label=f"No-skill baseline ({base*100:.0f}%)")
+ax.set_xlabel("Recall (share of churners caught)"); ax.set_ylabel("Precision")
+ax.set_ylim(0,1); ax.set_xlim(0,1)
+ax.set_title("Precision-Recall: honest view beyond ROC-AUC",fontweight="bold",color=NAVY)
+ax.legend(loc="upper right"); save(fig,"13_pr_curve.png")
+
+# ---- 14. feature-group ablation (does more signal help?) ----
+ab=R["ablation"]; steps=[a["step"] for a in ab]; aucs=[a["auc"] for a in ab]; nf=[a["n_features"] for a in ab]
+fig,ax=plt.subplots(figsize=(8.4,4.7))
+ax.plot(steps,aucs,marker="o",color=NAVY,lw=2.6,ms=9)
+for x,(a,n) in enumerate(zip(aucs,nf)):
+    ax.text(x,a+0.0015,f"{a:.3f}",ha="center",fontweight="bold",color=NAVY,fontsize=10.5)
+    ax.text(x,a-0.0025,f"{n} feats",ha="center",color=GRAY,fontsize=8.5)
+lo=min(aucs); hi=max(aucs); pad=max(0.004,(hi-lo)*0.4)
+ax.set_ylim(lo-pad,hi+pad)
+ax.set_title("Ablation: behavioural signal helps, then plateaus near ~0.69",fontweight="bold",color=NAVY)
+ax.set_ylabel("Test ROC-AUC"); ax.set_xlabel("Cumulative feature groups added")
+save(fig,"14_ablation.png")
 
 print("ALL CHARTS DONE")
