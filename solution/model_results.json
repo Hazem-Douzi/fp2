@@ -1,0 +1,66 @@
+{
+  "LogisticRegression": {
+    "auc": 0.6211,
+    "accuracy": 0.5892,
+    "lift_top10": 1.311,
+    "capture_top10": 0.131,
+    "prec_top10": 0.65,
+    "lift_top20": 1.286,
+    "capture_top20": 0.257,
+    "prec_top20": 0.637
+  },
+  "RandomForest": {
+    "auc": 0.6766,
+    "accuracy": 0.6215,
+    "lift_top10": 1.539,
+    "capture_top10": 0.154,
+    "prec_top10": 0.763,
+    "lift_top20": 1.44,
+    "capture_top20": 0.288,
+    "prec_top20": 0.714
+  },
+  "XGBoost": {
+    "auc": 0.6957,
+    "accuracy": 0.6366,
+    "lift_top10": 1.591,
+    "capture_top10": 0.159,
+    "prec_top10": 0.788,
+    "lift_top20": 1.485,
+    "capture_top20": 0.297,
+    "prec_top20": 0.736
+  },
+  "LightGBM": {
+    "auc": 0.6955,
+    "accuracy": 0.6398,
+    "lift_top10": 1.595,
+    "capture_top10": 0.159,
+    "prec_top10": 0.79,
+    "lift_top20": 1.483,
+    "capture_top20": 0.297,
+    "prec_top20": 0.735
+  },
+  "xgb_cv_auc_mean": 0.6969,
+  "xgb_cv_auc_std": 0.0035,
+  "top_features": {
+    "eqpdays": 0.0441,
+    "refurb_new": 0.0347,
+    "months": 0.0334,
+    "hnd_price": 0.0248,
+    "mou_Mean": 0.0191,
+    "asl_flag": 0.0182,
+    "uniqsubs": 0.016,
+    "change_mou": 0.0159,
+    "totmrc_Mean": 0.0153,
+    "infobase": 0.0144,
+    "vceovr_Mean": 0.0143,
+    "lor": 0.0135,
+    "avgqty": 0.0134,
+    "ethnic": 0.0131,
+    "mou_cvce_Mean": 0.0127,
+    "avgrev": 0.0123,
+    "ovrrev_Mean": 0.0121,
+    "avgmou": 0.0118,
+    "HHstatin": 0.0118,
+    "ovrmou_Mean": 0.0117
+  }
+}
